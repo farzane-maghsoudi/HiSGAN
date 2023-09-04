@@ -72,7 +72,7 @@ def main():
       exit()
 
     # open session
-    gan = TLNICE(args)
+    gan = QSGAN(args)
 
     # build graph
     gan.build_model()
