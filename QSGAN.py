@@ -10,14 +10,14 @@ from thop import profile
 from thop import clever_format
 import shutil
 
-class TLNICE(object) :
+class QSGAN(object) :
     def __init__(self, args):
         self.light = args.light
 
         if self.light :
-            self.model_name = 'TLNICE_light'
+            self.model_name = 'QSGAN_light'
         else :
-            self.model_name = 'TLNICE'
+            self.model_name = 'QSGAN'
 
         self.result_dir = args.result_dir
         self.dataset = args.dataset
