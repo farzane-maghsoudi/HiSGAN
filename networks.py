@@ -98,7 +98,7 @@ class ResnetGenerator(nn.Module):
         self.conv_block1 = nn.Sequential(*conv_block1)
         self.mult = 4
 
-    def forward(self, z):
+    def forward(self, input, z):
         x = z
         x = self.UpBlock0(x)
 
@@ -328,10 +328,6 @@ class Discriminator(nn.Module):
                  nn.utils.spectral_norm(nn.Conv2d(ndf*4, ndf*4, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU(),
                  torch.fft.ifft2(),  nn.Conv2d(ndf*4, ndf*4, kernel_size=1, stride=1, bias=True)]
         self.GELU = nn.nn.GELU()
-        #ورودی و خروجی d تغییر خواهد کرد و و تابع d را باید اصلاح کرد
-
-
-
 
         #Discriminator
         Dis1 = [nn.ReflectionPad2d(1),
@@ -389,5 +385,8 @@ class Discriminator(nn.Module):
         x3 = self.pad(x3)
         out1 = self.conv1(x1)
         out2 = self.conv2(x3)
+
+        # number ibput and output cheked.
+        #x2, x3, x4 for loss CT.
         
-        return out1, out2, z
+        return x2, x3, x4, out1, out2, z
