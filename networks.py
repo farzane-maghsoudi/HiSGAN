@@ -358,32 +358,17 @@ class Discriminator(nn.Module):
                       nn.utils.spectral_norm(
                       nn.Conv2d(ndf*4, ndf*8, kernel_size=4, stride=2, padding=0, bias=True)),
                       nn.LeakyReLU(0.2, True)]
-        Dis3 = [nn.ReflectionPad2d(1),
-                      nn.utils.spectral_norm(
-                      nn.Conv2d(ndf*4, ndf*4, kernel_size=4, stride=2, padding=0, bias=True)),
-                      nn.LeakyReLU(0.2, True),
-                      nn.ReflectionPad2d(1),
-                      nn.utils.spectral_norm(
-                      nn.Conv2d(ndf*4, ndf*8, kernel_size=4, stride=2, padding=0, bias=True)),
-                      nn.LeakyReLU(0.2, True),
-                      nn.ReflectionPad2d(1),
-                      nn.utils.spectral_norm(
-                      nn.Conv2d(ndf*8, ndf*16, kernel_size=4, stride=2, padding=0, bias=True)),
-                      nn.LeakyReLU(0.2, True)]
         
         self.conv1 = nn.utils.spectral_norm(   #1+3*2^0 + 3*2^1 + 3*2^2 +3*2^3 + 3*2^3= 70
             nn.Conv2d(ndf*4, 1, kernel_size=4, stride=1, padding=0, bias=False))
         self.conv2 = nn.utils.spectral_norm(
             nn.Conv2d(ndf*8, 1, kernel_size=4, stride=1, padding=0, bias=False))
-        self.conv3 = nn.utils.spectral_norm(
-            nn.Conv2d(ndf*16, 1, kernel_size=4, stride=1, padding=0, bias=False))
         
 
         self.pad = nn.ReflectionPad2d(1)
 
         self.Dis1 = nn.Sequential(*Dis1)
         self.Dis2 = nn.Sequential(*Dis2)
-        self.Dis3 = nn.Sequential(*Dis3)
         
         self.enc1 = nn.Sequential(*enc1)
         self.enc2 = nn.Sequential(*enc2)
@@ -392,24 +377,17 @@ class Discriminator(nn.Module):
     def forward(self, input):
       
         x1 = self.enc1(input)
-        x1 = self.enc2(x1)
-        x2 = self.enc3(x1)
-        x3 = self.enc4(x2)
+        x2 = self.enc2(x1)
+        x3 = self.enc3(x2)
+        x4 = self.enc4(x3)
         
-        z = x =  self.GELU(x3)
+        z = x =  self.GELU(x4)
 
-
-
-        
         x1 = self.Dis1(x1)
-        x2 = self.Dis2(x2)
-        x3 = self.Dis3(x3)
+        x3 = self.Dis2(x3)
         x1 = self.pad(x1)
-        x2 = self.pad(x2)
         x3 = self.pad(x3)
-        
         out1 = self.conv1(x1)
-        out2 = self.conv2(x2)
-        out3 = self.conv3(x3)
+        out2 = self.conv2(x3)
         
-        return out1, out2, out3, z
+        return out1, out2, z
