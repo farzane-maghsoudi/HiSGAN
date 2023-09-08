@@ -328,6 +328,7 @@ class Discriminator(nn.Module):
                  nn.utils.spectral_norm(nn.Conv2d(ndf*4, ndf*4, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU(),
                  torch.fft.ifft2(),  nn.Conv2d(ndf*4, ndf*4, kernel_size=1, stride=1, bias=True)]
         self.GELU = nn.nn.GELU()
+        #ورودی و خروجی d تغییر خواهد کرد و و تابع d را باید اصلاح کرد
 
 
 
