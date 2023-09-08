@@ -290,67 +290,61 @@ class ILN(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, input_nc, ndf=64, n_layers=7):
+    def __init__(self, input_nc, ndf=64):
         super(Discriminator, self).__init__() 
 
         # proposed Encoder
         enc1 = [nn.ReflectionPad2d(1),
                  nn.utils.spectral_norm(
                  nn.Conv2d(input_nc, ndf, kernel_size=3, stride=1, padding=0, bias=True)),
-                 nn.ReLU(True)]
-                 
-        enc11 = [nn.Conv2d(ndf, ndf*2, kernel_size=1, stride=1, bias=True),
-                 nn.MaxPool2d(4),
-                 nn.ReLU(True)
-                 ]
+                 nn.GELU()]
+        enc1 += [nn.utils.spectral_norm(nn.Conv2d(ndf, ndf, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU(),
+                 torch.fft.fft2(),
+                 nn.utils.spectral_norm(nn.Conv2d(ndf, ndf, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU(),
+                 torch.fft.ifft2(),  nn.Conv2d(ndf, ndf, kernel_size=1, stride=1, bias=True)]
+        
         enc2 = [nn.ReflectionPad2d(1),
                  nn.utils.spectral_norm(
-                 nn.Conv2d(ndf, ndf*2, kernel_size=3, stride=2, padding=0, bias=True)),
-                 nn.ReLU(True)
-                 ]
-        enc22 = [nn.MaxPool2d(2),
-                 nn.ReLU(True)]
+                 nn.Conv2d(ndf, ndf, kernel_size=3, stride=2, padding=0, bias=True)),
+                 nn.GELU()]
+        enc2 += [nn.utils.spectral_norm(nn.Conv2d(ndf, ndf, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU(),
+                 torch.fft.fft2(),
+                 nn.utils.spectral_norm(nn.Conv2d(ndf, ndf, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU(),
+                 torch.fft.ifft2(),  nn.Conv2d(ndf, ndf, kernel_size=1, stride=1, bias=True)]
         enc3 = [nn.ReflectionPad2d(1),
                  nn.utils.spectral_norm(
+                 nn.Conv2d(ndf, ndf*2, kernel_size=3, stride=2, padding=0, bias=True)),
+                 nn.GELU()]
+        enc1 += [nn.utils.spectral_norm(nn.Conv2d(ndf*2, ndf*2, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU(),
+                 torch.fft.fft2(),
+                 nn.utils.spectral_norm(nn.Conv2d(ndf*2, ndf*2, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU(),
+                 torch.fft.ifft2(),  nn.Conv2d(ndf*2, ndf*2, kernel_size=1, stride=1, bias=True)]
+        enc4 = [nn.ReflectionPad2d(1),
+                 nn.utils.spectral_norm(
                  nn.Conv2d(ndf*2, ndf*4, kernel_size=3, stride=2, padding=0, bias=True)),
-                 nn.ReLU(True)
-                 ]
-        enc33 = [nn.Conv2d(ndf*4, ndf*2, kernel_size=1, stride=1, bias=True),
-                 nn.ReLU(True)]
+                 nn.GELU()]
+        enc4 += [nn.utils.spectral_norm(nn.Conv2d(ndf*4, ndf*4, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU(),
+                 torch.fft.fft2(),
+                 nn.utils.spectral_norm(nn.Conv2d(ndf*4, ndf*4, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU(),
+                 torch.fft.ifft2(),  nn.Conv2d(ndf*4, ndf*4, kernel_size=1, stride=1, bias=True)]
+        self.GELU = nn.nn.GELU()
 
-        #Proposed adaptive feature fution.
-        self.softmaxAFF = nn.Softmax(3)
-        AFF1 = [nn.ReflectionPad2d(1),
-                nn.Conv2d(ndf*2, 1, kernel_size=3, stride=1, padding=0, bias=True),
-                nn.InstanceNorm2d(ndf*2)]
-        AFF2 = [nn.ReflectionPad2d(1),
-                nn.Conv2d(ndf*2, 1, kernel_size=3, stride=1, padding=0, bias=True)]
-        AFF = [nn.Conv2d(3*ndf*2, ndf*2, kernel_size=1, stride=1, padding=0, bias=True),
-               nn.ReflectionPad2d(1),
-               nn.Conv2d(ndf*2, ndf*2, kernel_size=3, stride=1, padding=0, bias=True)]
-        
-        
-        # Class Activation Map
-        mult = 2 ** (1)
-        self.fc = nn.utils.spectral_norm(nn.Linear(ndf * mult * 2, 1, bias=False))
-        self.conv1x1 = nn.Conv2d(ndf * mult * 2, ndf * mult, kernel_size=1, stride=1, bias=True)
-        self.leaky_relu = nn.LeakyReLU(0.2, True)
-        self.lamda = nn.Parameter(torch.zeros(1))
+
 
 
         #Discriminator
         Dis1 = [nn.ReflectionPad2d(1),
                       nn.utils.spectral_norm(
                       nn.Conv2d(ndf, ndf, kernel_size=4, stride=2, padding=0, bias=True)),
-                      nn.LeakyReLU(0.2, True),
+                      nn.nn.GELU(),
                       nn.ReflectionPad2d(1),
                       nn.utils.spectral_norm(
                       nn.Conv2d(ndf, ndf*2, kernel_size=4, stride=2, padding=0, bias=True)),
-                      nn.LeakyReLU(0.2, True),
+                      nn.nn.GELU(),
                       nn.ReflectionPad2d(1),
                       nn.utils.spectral_norm(
                       nn.Conv2d(ndf*2, ndf*4, kernel_size=4, stride=2, padding=0, bias=True)),
-                      nn.LeakyReLU(0.2, True)]
+                      nn.nn.GELU()]
         Dis2 = [nn.ReflectionPad2d(1),
                       nn.utils.spectral_norm(
                       nn.Conv2d(ndf*2, ndf*2, kernel_size=4, stride=2, padding=0, bias=True)),
@@ -393,47 +387,19 @@ class Discriminator(nn.Module):
         self.enc1 = nn.Sequential(*enc1)
         self.enc2 = nn.Sequential(*enc2)
         self.enc3 = nn.Sequential(*enc3)
-        self.enc11 = nn.Sequential(*enc11)
-        self.enc22 = nn.Sequential(*enc22)
-        self.enc33 = nn.Sequential(*enc33)
-        self.AFF1 = nn.Sequential(*AFF1)
-        self.AFF2 = nn.Sequential(*AFF2)
-        self.AFF = nn.Sequential(*AFF)
-
+        self.enc4 = nn.Sequential(*enc4)
     def forward(self, input):
       
         x1 = self.enc1(input)
-        x2 = self.enc2(x1)
-        x3 = self.enc3(x2)
-
-        x11 = self.enc11(x1)
-        x22 = self.enc22(x2)
-        x33 = self.enc33(x3)
-
-        #x11 = x11 * self.softmaxAFF(self.AFF1(x11))
-        #x33 = x33 * self.softmaxAFF(self.AFF3(x33))
-        x33 = x33 * self.softmaxAFF(self.AFF1(x33))
-        x22 = x22 * self.softmaxAFF(self.AFF2(x22))
-
-        x_0 = x = self.AFF(torch.cat([x11, x22, x33], 1))
-
-        #x_0 = x = self.model(input)
-
-        gap = torch.nn.functional.adaptive_avg_pool2d(x, 1)
-        gmp = torch.nn.functional.adaptive_max_pool2d(x, 1)
-        x = torch.cat([x, x], 1)
-        cam_logit = torch.cat([gap, gmp], 1)
-        cam_logit = self.fc(cam_logit.view(cam_logit.shape[0], -1))
-        weight = list(self.fc.parameters())[0]
-        x = x * weight.unsqueeze(2).unsqueeze(3)
-        x = self.conv1x1(x)
-
-        x = self.lamda*x + x_0
-        x = self.leaky_relu(x)
+        x1 = self.enc2(x1)
+        x2 = self.enc3(x1)
+        x3 = self.enc4(x2)
         
-        heatmap = torch.sum(x, dim=1, keepdim=True)
-        z = x
+        z = x =  self.GELU(x3)
 
+
+
+        
         x1 = self.Dis1(x1)
         x2 = self.Dis2(x2)
         x3 = self.Dis3(x3)
@@ -445,4 +411,4 @@ class Discriminator(nn.Module):
         out2 = self.conv2(x2)
         out3 = self.conv3(x3)
         
-        return out1, out2, out3, cam_logit, heatmap, z
+        return out1, out2, out3, z
