@@ -100,6 +100,29 @@ class ResnetGenerator(nn.Module):
 
     def forward(self, input, z):
         x = z
+        # calcuator SVD in input
+        S = torch.linalg.svdvals(input)
+        K = 32
+        
+        c1 = torch.matmul(torch.reshape(S[0,0:K,0], (K,1)), torch.reshape(S[0,0:K,1], (1,K)))
+        c2 = torch.matmul(torch.reshape(S[0,0:K,1], (K,1)), torch.reshape(S[0,0:K,2], (1,K)))
+        c3 = torch.matmul(torch.reshape(S[0,0:K,0], (K,1)), torch.reshape(S[0,0:K,2], (1,K)))
+        c4 = torch.matmul(torch.reshape(c1, (K, K, 1)), torch.reshape(S[0,0:K,2], (1, 1, K)))
+        
+        svd = torch.cat((torch.reshape(c1, (1,K,K,1)),torch.reshape(c2, (1,K,K,1)),torch.reshape(c3, (1,K,K,1))), dim=3)
+        svd = torch.cat((svd,torch.reshape(c4, (1,K,K,K))), dim=3)
+
+        # concatenate SVD and Encoder
+        x = torch.cat((x,svd), dim=3) # (1, k, k, k+3) + (1 , k, k, 256) = (1, k, k, 256+k+3) 
+
+        # Bottleneck
+
+
+        # Up-Sampling
+
+
+
+        
         x = self.UpBlock0(x)
 
         if self.light:
@@ -370,6 +393,7 @@ class Discriminator(nn.Module):
         self.enc2 = nn.Sequential(*enc2)
         self.enc3 = nn.Sequential(*enc3)
         self.enc4 = nn.Sequential(*enc4)
+        
     def forward(self, input):
       
         x1 = self.enc1(input)
