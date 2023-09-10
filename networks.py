@@ -3,6 +3,7 @@ import torch.nn as nn
 import math
 from torch.nn.parameter import Parameter
 from utils import resize2d
+from sgformer import *
 from involution_pytorch import Inv2d
 
 class ResnetGenerator(nn.Module):
