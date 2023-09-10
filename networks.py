@@ -1,7 +1,14 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+import math
 from torch.nn.parameter import Parameter
 from utils import resize2d
+from involution_pytorch import Inv2d
+from functools import partial
+from timm.models.layers import DropPath, to_2tuple, trunc_normal_
+from timm.models.registry import register_model
+from timm.models.vision_transformer import _cfg
 
 class ResnetGenerator(nn.Module):
     def __init__(self, input_nc, output_nc, ngf=64, n_blocks=100, img_size=256, light=False):
@@ -13,6 +20,16 @@ class ResnetGenerator(nn.Module):
         self.n_blocks = n_blocks
         self.img_size = img_size
         self.light = light
+
+        # Bottleneck
+        self.inv1 = Inv2d(channels=291, kernel_size=3, stride=1) # channel+k+3 => channel=256, k=32, 291 => channel=128, k=64, 195
+        self.inv2 = Inv2d(channels=291, kernel_size=3, stride=1) 
+        self.inv3 = Inv2d(channels=291, kernel_size=3, stride=1) 
+        self.inv4 = Inv2d(channels=291, kernel_size=3, stride=1) 
+        self.inv5 = Inv2d(channels=291, kernel_size=3, stride=1) 
+
+        self.SGfomer1 = 
+        # Up-Sampling
 
         n_downsampling = 2
 
@@ -109,11 +126,11 @@ class ResnetGenerator(nn.Module):
         c3 = torch.matmul(torch.reshape(S[0,0:K,0], (K,1)), torch.reshape(S[0,0:K,2], (1,K)))
         c4 = torch.matmul(torch.reshape(c1, (K, K, 1)), torch.reshape(S[0,0:K,2], (1, 1, K)))
         
-        svd = torch.cat((torch.reshape(c1, (1,K,K,1)),torch.reshape(c2, (1,K,K,1)),torch.reshape(c3, (1,K,K,1))), dim=3)
-        svd = torch.cat((svd,torch.reshape(c4, (1,K,K,K))), dim=3)
+        svd = torch.cat((torch.reshape(c1, (1,1,K,K)),torch.reshape(c2, (1,1,K,K)),torch.reshape(c3, (1,1,K,K))), dim=1)
+        svd = torch.cat((svd,torch.reshape(c4, (1,K,K,K))), dim=1)
 
         # concatenate SVD and Encoder
-        x = torch.cat((x,svd), dim=3) # (1, k, k, k+3) + (1 , k, k, 256) = (1, k, k, 256+k+3) 
+        x = torch.cat((x,svd), dim=1) # (1, k+3, k, k) + (1 ,256, k, k) = (1, 256+k+3, k, k) 
 
         # Bottleneck
 
@@ -410,7 +427,9 @@ class Discriminator(nn.Module):
         out1 = self.conv1(x1)
         out2 = self.conv2(x3)
 
+        
         # number ibput and output cheked.
         #x2, x3, x4 for loss CT.
         
         return x2, x3, x4, out1, out2, z
+
