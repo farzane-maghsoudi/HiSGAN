@@ -1,14 +1,9 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import math
 from torch.nn.parameter import Parameter
 from utils import resize2d
 from involution_pytorch import Inv2d
-from functools import partial
-from timm.models.layers import DropPath, to_2tuple, trunc_normal_
-from timm.models.registry import register_model
-from timm.models.vision_transformer import _cfg
 
 class ResnetGenerator(nn.Module):
     def __init__(self, input_nc, output_nc, ngf=64, n_blocks=100, img_size=256, light=False):
