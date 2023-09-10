@@ -1,3 +1,11 @@
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from functools import partial
+
+from timm.models.layers import DropPath, trunc_normal_
+import math
+
 class Mlp(nn.Module):
     def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0.):
         super().__init__()
@@ -280,3 +288,16 @@ class Block(nn.Module):
         x = x + self.drop_path(self.mlp(self.norm2(x), H, W))
 
         return x, mask
+
+class DWConv(nn.Module):
+    def __init__(self, dim=768):
+        super(DWConv, self).__init__()
+        self.dwconv = nn.Conv2d(dim, dim, 3, 1, 1, bias=True, groups=dim)
+
+    def forward(self, x, H, W):
+        B, N, C = x.shape
+        x = x.transpose(1, 2).view(B, C, H, W)
+        x = self.dwconv(x)
+        x = x.flatten(2).transpose(1, 2)
+
+        return x
