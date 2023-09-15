@@ -41,6 +41,19 @@ class Mlp(nn.Module):
         x = self.drop(x)
         return x
 
+class DWConv(nn.Module):
+    def __init__(self, dim=768):
+        super(DWConv, self).__init__()
+        self.dwconv = nn.Conv2d(dim, dim, 3, 1, 1, bias=True, groups=dim)
+
+    def forward(self, x, H, W):
+        B, N, C = x.shape
+        x = x.transpose(1, 2).view(B, C, H, W)
+        x = self.dwconv(x)
+        x = x.flatten(2).transpose(1, 2)
+
+        return x
+
 def local_conv(dim):
     return nn.Conv2d(dim, dim, kernel_size=3, padding=1, stride=1, groups=dim)
 
@@ -59,16 +72,18 @@ class Attention(nn.Module):
                 self.q = nn.Linear(dim, dim, bias=qkv_bias)
                 self.kv1 = nn.Linear(dim, dim, bias=qkv_bias)
                 self.kv2 = nn.Linear(dim, dim, bias=qkv_bias)
+
                 if self.sr_ratio==8:
-                    f1, f2, f3 = 14*14, 56, 28
+                    #r1, r2, r3 = 32,64,4  # for h = 64
+                    r1, r2, r3 = 16, 8, 4
                 elif self.sr_ratio==4:
-                    f1, f2, f3 = 49, 14, 7
+                    r1, r2, r3 = 8, 4, 2
                 elif self.sr_ratio==2:
-                    f1, f2, f3 = 2, 1, None
-                self.f1 = nn.Linear(f1, 1)
-                self.f2 = nn.Linear(f2, 1)
-                if f3 is not None:
-                    self.f3 = nn.Linear(f3, 1)
+                    r1, r2, r3 = 2, 1, None
+                self.f1 = nn.Linear(r1, 1)
+                self.f2 = nn.Linear(r2, 1)
+                if r3 is not None:
+                    self.f3 = nn.Linear(r3, 1)
             else:
                 self.sr = nn.Conv2d(dim, dim, kernel_size=sr_ratio, stride=sr_ratio)
                 self.norm = nn.LayerNorm(dim)
@@ -107,35 +122,36 @@ class Attention(nn.Module):
                 m.bias.data.zero_()
 
     def forward(self, x, H, W, mask):
-        B, N, C = x.shape
-        lepe = self.lepe_conv(
-            self.lepe_linear(x).transpose(1, 2).view(B, C, H, W)).view(B, C, -1).transpose(-1, -2)
+        x = x.flatten(2).transpose(1, 2)
+        B, L, C = x.shape
+        B_, N= H, W
+        lepe = self.lepe_conv(self.lepe_linear(x).transpose(1, 2).view(B, C, H, W)).view(H, C, -1).transpose(-1, -2)  #(1,H*W,C)
+        x = x.view(B, H, W, C).reshape(H, W, C)
+
         if self.sr_ratio > 1:
             if mask is None:
                 # global
-                q1 = self.q1(x).reshape(B, N, self.num_heads//2, C // self.num_heads).permute(0, 2, 1, 3)
-                x_ = x.permute(0, 2, 1).reshape(B, C, H, W)
-                x_1 = self.sr(x_).reshape(B, C, -1).permute(0, 2, 1)
+                q1 = self.q1(x).reshape(B_, N, self.num_heads//2, C // self.num_heads).permute(0, 2, 1, 3)
+                x_ = x.permute(2, 0, 1).reshape(B, C, H, W)
+                x_1 = self.sr(x_).reshape(C, B_//self.sr_ratio,N//self.sr_ratio).permute(1,2,0)
                 x_1 = self.act(self.norm(x_1))
-                kv1 = self.kv1(x_1).reshape(B, -1, 2, self.num_heads//2, C // self.num_heads).permute(2, 0, 3, 1, 4)
-                k1, v1 = kv1[0], kv1[1] #B head N C
+                kv1 = self.kv1(x_1).reshape(B_//self.sr_ratio, -1, 2, self.num_heads//2, C // self.num_heads).permute(2, 0, 3, 1, 4)
+                k1, v1 = kv1[0].repeat(self.sr_ratio,1,self.sr_ratio,1), kv1[1].repeat(self.sr_ratio,1,self.sr_ratio,1) #B_ head N C
 
                 attn1 = (q1 @ k1.transpose(-2, -1)) * self.scale #B head Nq Nkv
                 attn1 = attn1.softmax(dim=-1)
                 attn1 = self.attn_drop(attn1)
-                x1 = (attn1 @ v1).transpose(1, 2).reshape(B, N, C//2)
+                x1 = (attn1 @ v1).transpose(1, 2).reshape(B_, N, C//2)
 
                 global_mask_value = torch.mean(attn1.detach().mean(1), dim=1) # B Nk  #max ?  mean ?
-                global_mask_value = F.interpolate(global_mask_value.view(B,1,H//self.sr_ratio,W//self.sr_ratio),
-                                                  (H, W), mode='nearest')[:, 0]
 
                 # local
-                q2 = self.q2(x).reshape(B, N, self.num_heads // 2, C // self.num_heads).permute(0, 2, 1, 3) #B head N C
-                kv2 = self.kv2(x_.reshape(B, C, -1).permute(0, 2, 1)).reshape(B, -1, 2, self.num_heads // 2,
+                q2 = self.q2(x).reshape(B_, N, self.num_heads // 2, C // self.num_heads).permute(0, 2, 1, 3) #B head N C
+                kv2 = self.kv2(x_.reshape(B_, C, -1).permute(0, 2, 1)).reshape(B_, -1, 2, self.num_heads // 2,
                                                                           C // self.num_heads).permute(2, 0, 3, 1, 4)
                 k2, v2 = kv2[0], kv2[1]
-                q_window = 7
-                window_size= 7
+                q_window = 8
+                window_size= 8
                 q2, k2, v2 = window_partition(q2, q_window, H, W), window_partition(k2, window_size, H, W), \
                              window_partition(v2, window_size, H, W)
                 attn2 = (q2 @ k2.transpose(-2, -1)) * self.scale
@@ -144,9 +160,9 @@ class Attention(nn.Module):
                 attn2 = self.attn_drop(attn2)
 
                 x2 = (attn2 @ v2)  # B*numheads*num_windows, window_size*window_size, C   .transpose(1, 2).reshape(B, N, C)
-                x2 = window_reverse(x2, q_window, H, W, self.num_heads // 2)
+                x2 = window_reverse(x2, q_window, H, W, self.num_heads // 2).transpose(1, 2).reshape(B_, N, C//2)
 
-                local_mask_value = torch.mean(attn2.detach().view(B, self.num_heads//2, H//window_size*W//window_size, window_size*window_size, window_size*window_size).mean(1), dim=2)
+                local_mask_value = torch.mean(attn2.detach().view(B, self.num_heads//2, H*W//window_size, window_size, window_size).mean(1), dim=2)
                 local_mask_value = local_mask_value.view(B, H // window_size, W // window_size, window_size, window_size)
                 local_mask_value=local_mask_value.permute(0, 1, 3, 2, 4).contiguous().view(B, H, W)
 
@@ -156,11 +172,11 @@ class Attention(nn.Module):
                 x = self.proj_drop(x)
                 # cal mask
                 mask = local_mask_value+global_mask_value
-                mask_1 = mask.view(B, H * W)
-                mask_2 = mask.permute(0, 2, 1).reshape(B, H * W)
+                mask_1 = mask.view(1, H * W)
+                mask_2 = mask.permute(0, 2, 1).reshape(1, H * W)
                 mask = [mask_1, mask_2]
             else:
-                q = self.q(x).reshape(B, N, self.num_heads, C // self.num_heads).permute(0, 2, 1, 3)
+                q = self.q(x).reshape(B_, N, self.num_heads, C // self.num_heads).permute(0, 2, 1, 3)
 
                 # mask [local_mask global_mask]  local_mask [value index]  value [B, H, W]
                 # use mask to fuse
@@ -168,23 +184,23 @@ class Attention(nn.Module):
                 mask_sort1, mask_sort_index1 = torch.sort(mask_1, dim=1)
                 mask_sort2, mask_sort_index2 = torch.sort(mask_2, dim=1)
                 if self.sr_ratio == 8:
-                    token1, token2, token3 = H * W // (14 * 14), H * W // 56, H * W // 28
-                    token1, token2, token3 = token1 // 4, token2 // 2, token3 // 4
-                elif self.sr_ratio == 4:
-                    token1, token2, token3 = H * W // 49, H * W // 14, H * W // 7
-                    token1, token2, token3 = token1 // 4, token2 // 2, token3 // 4
+                    r1, r2, r3 = 16, 8, 4
+                    token1, token2, token3 = H * W // (r1*4), H * W // (r2*2), H * W //(r3*4)
+                elif self.sr_ratio==4:
+                    r1, r2, r3 = 8, 4, 2
+                    token1, token2, token3 = H * W // (r1*4), H * W // (r2*2), H * W //(r3*4)
                 elif self.sr_ratio == 2:
-                    token1, token2 = H * W // 2, H * W // 1
-                    token1, token2 = token1 // 2, token2 // 2
+                    token1, token2 = H * W // (r1*2), H * W // (r2*1)
+
                 if self.sr_ratio==4 or self.sr_ratio==8:
+                    x_ = x.permute( 1, 0, 2).reshape(1, H * W, C)
+                    x = x.reshape(1, H * W, C)
                     p1 = torch.gather(x, 1, mask_sort_index1[:, :H * W // 4].unsqueeze(-1).repeat(1, 1, C))  # B, N//4, C
                     p2 = torch.gather(x, 1, mask_sort_index1[:, H * W // 4:H * W // 4 * 3].unsqueeze(-1).repeat(1, 1, C))
                     p3 = torch.gather(x, 1, mask_sort_index1[:, H * W // 4 * 3:].unsqueeze(-1).repeat(1, 1, C))
                     seq1 = torch.cat([self.f1(p1.permute(0, 2, 1).reshape(B, C, token1, -1)).squeeze(-1),
                                       self.f2(p2.permute(0, 2, 1).reshape(B, C, token2, -1)).squeeze(-1),
                                       self.f3(p3.permute(0, 2, 1).reshape(B, C, token3, -1)).squeeze(-1)], dim=-1).permute(0,2,1)  # B N C
-
-                    x_ = x.view(B, H, W, C).permute(0, 2, 1, 3).reshape(B, H * W, C)
                     p1_ = torch.gather(x_, 1, mask_sort_index2[:, :H * W // 4].unsqueeze(-1).repeat(1, 1, C))  # B, N//4, C
                     p2_ = torch.gather(x_, 1, mask_sort_index2[:, H * W // 4:H * W // 4 * 3].unsqueeze(-1).repeat(1, 1, C))
                     p3_ = torch.gather(x_, 1, mask_sort_index2[:, H * W // 4 * 3:].unsqueeze(-1).repeat(1, 1, C))
@@ -192,53 +208,68 @@ class Attention(nn.Module):
                                       self.f2(p2_.permute(0, 2, 1).reshape(B, C, token2, -1)).squeeze(-1),
                                       self.f3(p3_.permute(0, 2, 1).reshape(B, C, token3, -1)).squeeze(-1)], dim=-1).permute(0,2,1)  # B N C
                 elif self.sr_ratio==2:
-                    p1 = torch.gather(x, 1, mask_sort_index1[:, :H * W // 2].unsqueeze(-1).repeat(1, 1, C))  # B, N//4, C
+                    x_ = x.permute( 1, 0, 2).reshape(1, H * W, C)
+                    x = x.reshape(1, H * W, C)
+
+                    p1 = torch.gather(x, 1, mask_sort_index1[:, :H * W // 2].unsqueeze(-1).repeat(1, 1, C))  # B, N//2, C
                     p2 = torch.gather(x, 1, mask_sort_index1[:, H * W // 2:].unsqueeze(-1).repeat(1, 1, C))
+                    
                     seq1 = torch.cat([self.f1(p1.permute(0, 2, 1).reshape(B, C, token1, -1)).squeeze(-1),
                                       self.f2(p2.permute(0, 2, 1).reshape(B, C, token2, -1)).squeeze(-1)], dim=-1).permute(0, 2, 1)  # B N C
 
-                    x_ = x.view(B, H, W, C).permute(0, 2, 1, 3).reshape(B, H * W, C)
                     p1_ = torch.gather(x_, 1, mask_sort_index2[:, :H * W // 2].unsqueeze(-1).repeat(1, 1, C))  # B, N//4, C
                     p2_ = torch.gather(x_, 1, mask_sort_index2[:, H * W // 2:].unsqueeze(-1).repeat(1, 1, C))
+                    print("p1_",p1_.shape)
+                    print("p2_",p2_.shape)
+
                     seq2 = torch.cat([self.f1(p1_.permute(0, 2, 1).reshape(B, C, token1, -1)).squeeze(-1),
                                       self.f2(p2_.permute(0, 2, 1).reshape(B, C, token2, -1)).squeeze(-1)], dim=-1).permute(0, 2, 1)  # B N C
 
-                kv1 = self.kv1(seq1).reshape(B, -1, 2, self.num_heads // 2, C // self.num_heads).permute(2, 0, 3, 1, 4) # kv B heads N C
-                kv2 = self.kv2(seq2).reshape(B, -1, 2, self.num_heads // 2, C // self.num_heads).permute(2, 0, 3, 1, 4)
+                kv1 = self.kv1(seq1).reshape(B_, -1, 2, self.num_heads // 2, C // self.num_heads).permute(2, 0, 3, 1, 4) # kv B heads N C
+                kv2 = self.kv2(seq2).reshape(B_, -1, 2, self.num_heads // 2, C // self.num_heads).permute(2, 0, 3, 1, 4)
                 kv = torch.cat([kv1, kv2], dim=2)
                 k, v = kv[0], kv[1]
                 attn = (q @ k.transpose(-2, -1)) * self.scale
                 attn = attn.softmax(dim=-1)
                 attn = self.attn_drop(attn)
 
-                x = (attn @ v).transpose(1, 2).reshape(B, N, C)
+                x = (attn @ v).transpose(1, 2).reshape(B_, N, C)
                 x = self.proj(x+lepe)
                 x = self.proj_drop(x)
                 mask=None
 
         else:
-            q = self.q(x).reshape(B, N, self.num_heads, C // self.num_heads).permute(0, 2, 1, 3)
-            kv = self.kv(x).reshape(B, -1, 2, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
+            q = self.q(x).reshape(B_, N, self.num_heads, C // self.num_heads).permute(0, 2, 1, 3)
+            kv = self.kv(x).reshape(B_, -1, 2, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
 
             k, v = kv[0], kv[1]
 
             attn = (q @ k.transpose(-2, -1)) * self.scale
             attn = attn.softmax(dim=-1)
             attn = self.attn_drop(attn)
-            x = (attn @ v).transpose(1, 2).reshape(B, N, C)
+            x = (attn @ v).transpose(1, 2).reshape(B_, N, C)
             x = self.proj(x+lepe)
             x = self.proj_drop(x)
-            mask=None
 
+            mask=None
+        x = x.permute(2, 0, 1).reshape(B, H, W, C)
         return x, mask
 
 def window_partition(x, window_size, H, W):
-    B, num_heads, N, C = x.shape
-    x = x.contiguous().view(B*num_heads, N, C).contiguous().view(B*num_heads, H, W, C)
+    """
+    Args:
+        x: (B, H, W, C)
+        window_size (int): window size
+
+    Returns:
+        windows: (num_windows*B, window_size, window_size, C)
+    """
+    B_, num_heads, N, C = x.shape
+    B = 1
+    x = x.contiguous().view(B_*num_heads, N, C).contiguous().view(B*num_heads, H, W, C)
     B, H, W, C = x.shape
     x = x.view(B, H // window_size, window_size, W // window_size, window_size, C)
-    windows = x.permute(0, 1, 3, 2, 4, 5).contiguous().view(-1, window_size, window_size, C).\
-        view(-1, window_size*window_size, C)
+    windows = x.permute(0, 1, 3, 2, 4, 5).contiguous().view( -1,window_size, window_size, C)
     return windows  #(B*numheads*num_windows, window_size, window_size, C)
 
 
@@ -255,6 +286,10 @@ class Block(nn.Module):
                  drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, sr_ratio=1, linear=False):
         super().__init__()
         self.norm1 = norm_layer(dim)
+        #self.attn = Attention(
+        #        dim=C, mask,
+         #       num_heads=8, qkv_bias=True, qk_scale=False,
+         #       attn_drop=0., proj_drop=0, sr_ratio=4, linear=False)
         self.attn = Attention(
             dim, mask,
             num_heads=num_heads, qkv_bias=qkv_bias, qk_scale=qk_scale,
@@ -283,21 +318,14 @@ class Block(nn.Module):
                 m.bias.data.zero_()
 
     def forward(self, x, H, W, mask):
+        #x = torch.randn( 1,256,64,64)
+        #B, C, H, W = x.shape
+        #mask= None
+        #outx, mask = attn(x, H, W, mask)
+        #print(outx.shape) #[64, 64, 256]
+        
         x_, mask = self.attn(self.norm1(x), H, W, mask)
         x = x + self.drop_path(x_)
         x = x + self.drop_path(self.mlp(self.norm2(x), H, W))
 
         return x, mask
-
-class DWConv(nn.Module):
-    def __init__(self, dim=768):
-        super(DWConv, self).__init__()
-        self.dwconv = nn.Conv2d(dim, dim, 3, 1, 1, bias=True, groups=dim)
-
-    def forward(self, x, H, W):
-        B, N, C = x.shape
-        x = x.transpose(1, 2).view(B, C, H, W)
-        x = self.dwconv(x)
-        x = x.flatten(2).transpose(1, 2)
-
-        return x
