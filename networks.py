@@ -24,6 +24,9 @@ class ResnetGenerator(nn.Module):
         self.inv4 = Inv2d(channels=291, kernel_size=3, stride=1) 
         self.inv5 = Inv2d(channels=291, kernel_size=3, stride=1) 
 
+        self.sgt1 = Block(dim, mask, num_heads, mlp_ratio=4., qkv_bias=False, qk_scale=None, drop=0., attn_drop=0.,
+                 drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, sr_ratio=1, linear=False)
+
         self.SGfomer1 = 
         # Up-Sampling
 
@@ -355,11 +358,11 @@ class Discriminator(nn.Module):
                  torch.fft.fft2(),
                  nn.utils.spectral_norm(nn.Conv2d(ndf*2, ndf*2, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU(),
                  torch.fft.ifft2(),  nn.Conv2d(ndf*2, ndf*2, kernel_size=1, stride=1, bias=True)]
-        enc4 = [nn.ReflectionPad2d(1),
+        #enc4 = [nn.ReflectionPad2d(1),
                  nn.utils.spectral_norm(
                  nn.Conv2d(ndf*2, ndf*4, kernel_size=3, stride=2, padding=0, bias=True)),
                  nn.GELU()]
-        enc4 += [nn.utils.spectral_norm(nn.Conv2d(ndf*4, ndf*4, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU(),
+        #enc4 += [nn.utils.spectral_norm(nn.Conv2d(ndf*4, ndf*4, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU(),
                  torch.fft.fft2(),
                  nn.utils.spectral_norm(nn.Conv2d(ndf*4, ndf*4, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU(),
                  torch.fft.ifft2(),  nn.Conv2d(ndf*4, ndf*4, kernel_size=1, stride=1, bias=True)]
@@ -405,16 +408,16 @@ class Discriminator(nn.Module):
         self.enc1 = nn.Sequential(*enc1)
         self.enc2 = nn.Sequential(*enc2)
         self.enc3 = nn.Sequential(*enc3)
-        self.enc4 = nn.Sequential(*enc4)
+        #self.enc4 = nn.Sequential(*enc4)
         
     def forward(self, input):
       
         x1 = self.enc1(input)
         x2 = self.enc2(x1)
         x3 = self.enc3(x2)
-        x4 = self.enc4(x3)
+        #x4 = self.enc4(x3)
         
-        z = x =  self.GELU(x4)
+        z = x =  self.GELU(x3)
 
         x1 = self.Dis1(x1)
         x3 = self.Dis2(x3)
@@ -427,5 +430,5 @@ class Discriminator(nn.Module):
         # number ibput and output cheked.
         #x2, x3, x4 for loss CT.
         
-        return x2, x3, x4, out1, out2, z
+        return x2, x3, out1, out2, z
 
