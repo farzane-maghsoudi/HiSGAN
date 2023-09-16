@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from functools import partial
+from sgformer import adaILN
 
 from timm.models.layers import DropPath, trunc_normal_
 import math
@@ -23,9 +24,6 @@ class Mlp(nn.Module):
             trunc_normal_(m.weight, std=.02)
             if isinstance(m, nn.Linear) and m.bias is not None:
                 nn.init.constant_(m.bias, 0)
-        elif isinstance(m, nn.LayerNorm):
-            nn.init.constant_(m.bias, 0)
-            nn.init.constant_(m.weight, 1.0)
         elif isinstance(m, nn.Conv2d):
             fan_out = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
             fan_out //= m.groups
@@ -87,7 +85,7 @@ class Attention(nn.Module):
                     
             else:
                 self.sr = nn.Conv2d(dim, dim, kernel_size=sr_ratio, stride=sr_ratio)
-                self.norm = nn.LayerNorm(dim)
+                self.norm = adaILN(dim)
                 self.act = nn.GELU()
 
                 self.q1 = nn.Linear(dim, dim//2, bias=qkv_bias)
@@ -113,9 +111,6 @@ class Attention(nn.Module):
             trunc_normal_(m.weight, std=.02)
             if isinstance(m, nn.Linear) and m.bias is not None:
                 nn.init.constant_(m.bias, 0)
-        elif isinstance(m, nn.LayerNorm):
-            nn.init.constant_(m.bias, 0)
-            nn.init.constant_(m.weight, 1.0)
         elif isinstance(m, nn.Conv2d):
             fan_out = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
             fan_out //= m.groups
@@ -285,9 +280,9 @@ def window_reverse(windows, window_size, H, W, head):
 class Block(nn.Module):
 
     def __init__(self, dim, mask, num_heads, mlp_ratio=4., qkv_bias=False, qk_scale=None, drop=0., attn_drop=0.,
-                 drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, sr_ratio=1, linear=False):
+                 drop_path=0., act_layer=nn.GELU, sr_ratio=1, linear=False):
         super().__init__()
-        self.norm1 = norm_layer(dim)
+        self.norm1 = adaILN(dim)
         #self.attn = Attention(
         #        dim=C, mask,
          #       num_heads=8, qkv_bias=True, qk_scale=False,
@@ -298,7 +293,7 @@ class Block(nn.Module):
             attn_drop=attn_drop, proj_drop=drop, sr_ratio=sr_ratio, linear=linear)
         # NOTE: drop path for stochastic depth, we shall see if this is better than dropout here
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
-        self.norm2 = norm_layer(dim)
+        self.norm2 = adaILN(dim)
         mlp_hidden_dim = int(dim * mlp_ratio)
         self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=act_layer, drop=drop)
 
@@ -309,9 +304,6 @@ class Block(nn.Module):
             trunc_normal_(m.weight, std=.02)
             if isinstance(m, nn.Linear) and m.bias is not None:
                 nn.init.constant_(m.bias, 0)
-        elif isinstance(m, nn.LayerNorm):
-            nn.init.constant_(m.bias, 0)
-            nn.init.constant_(m.weight, 1.0)
         elif isinstance(m, nn.Conv2d):
             fan_out = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
             fan_out //= m.groups
