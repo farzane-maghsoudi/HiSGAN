@@ -212,30 +212,28 @@ class QSGAN(object) :
             # Update D
             self.D_optim.zero_grad()
 
-            real_LA_logit,real_MA_logit,real_GA_logit, real_A_cam_logit, _, real_A_z = self.disA(real_A)
-            real_LB_logit,real_MB_logit,real_GB_logit, real_B_cam_logit, _, real_B_z = self.disB(real_B)
+            real_A_x1, real_A_x2, real_A_x3,real_LA_logit,real_GA_logit, real_A_z = self.disA(real_A)
+            real_B_x1, real_B_x2, real_B_x3,real_LB_logit,real_GB_logit, real_B_z = self.disB(real_B)
 
-            fake_A2B = self.gen2B(real_A_z)
-            fake_B2A = self.gen2A(real_B_z)
+            fake_A2B = self.gen2B(real_A, real_A_z, real_A_x1, real_A_x2, real_A_x3)
+            fake_B2A = self.gen2A(real_B, real_B_z, real_B_x1, real_B_x2, real_B_x3)
 
             fake_B2A = fake_B2A.detach()
             fake_A2B = fake_A2B.detach()
 
-            fake_LA_logit,fake_MA_logit,fake_GA_logit, fake_A_cam_logit, _, fake_A_z = self.disA(fake_B2A)
-            fake_LB_logit,fake_MB_logit,fake_GB_logit, fake_B_cam_logit, _, fake_B_z = self.disB(fake_A2B)
+            fake_B2A_x1, fake_B2A_x2, fake_B2A_x3, fake_LA_logit,fake_GA_logit, fake_A_z = self.disA(fake_B2A)
+            fake_A2B_x1, fake_A2B_x2, fake_A2B_x3, fake_LB_logit,fake_GB_logit, fake_B_z = self.disB(fake_A2B)
 
 
             D_ad_loss_GA = self.MSE_loss(real_GA_logit, torch.ones_like(real_GA_logit).to(self.device)) + self.MSE_loss(fake_GA_logit, torch.zeros_like(fake_GA_logit).to(self.device))
-            D_ad_loss_MA = self.MSE_loss(real_MA_logit, torch.ones_like(real_MA_logit).to(self.device)) + self.MSE_loss(fake_MA_logit, torch.zeros_like(fake_MA_logit).to(self.device))
             D_ad_loss_LA = self.MSE_loss(real_LA_logit, torch.ones_like(real_LA_logit).to(self.device)) + self.MSE_loss(fake_LA_logit, torch.zeros_like(fake_LA_logit).to(self.device))
             D_ad_loss_GB = self.MSE_loss(real_GB_logit, torch.ones_like(real_GB_logit).to(self.device)) + self.MSE_loss(fake_GB_logit, torch.zeros_like(fake_GB_logit).to(self.device))
-            D_ad_loss_MB = self.MSE_loss(real_MB_logit, torch.ones_like(real_MB_logit).to(self.device)) + self.MSE_loss(fake_MB_logit, torch.zeros_like(fake_MB_logit).to(self.device))
             D_ad_loss_LB = self.MSE_loss(real_LB_logit, torch.ones_like(real_LB_logit).to(self.device)) + self.MSE_loss(fake_LB_logit, torch.zeros_like(fake_LB_logit).to(self.device))
-            D_ad_cam_loss_A = self.MSE_loss(real_A_cam_logit, torch.ones_like(real_A_cam_logit).to(self.device)) + self.MSE_loss(fake_A_cam_logit, torch.zeros_like(fake_A_cam_logit).to(self.device))
-            D_ad_cam_loss_B = self.MSE_loss(real_B_cam_logit, torch.ones_like(real_B_cam_logit).to(self.device)) + self.MSE_loss(fake_B_cam_logit, torch.zeros_like(fake_B_cam_logit).to(self.device))
+            D_loss_pnalty_A = cal_gradient_penalty(real_A, A=True) + cal_gradient_penalty(fake_B2A, A=True)
+            D_loss_pnalty_B = cal_gradient_penalty(real_B, A=False) + cal_gradient_penalty(fake_A2B, A=True)
             
-            D_loss_A = self.adv_weight * (D_ad_loss_GA + D_ad_loss_MA + D_ad_cam_loss_A + D_ad_loss_LA)
-            D_loss_B = self.adv_weight * (D_ad_loss_GB + D_ad_loss_MB + D_ad_cam_loss_B + D_ad_loss_LB)
+            D_loss_A = self.adv_weight * (D_ad_loss_GA + D_ad_cam_loss_A) + self.adv_weight * D_loss_pnalty_A
+            D_loss_B = self.adv_weight * (D_ad_loss_GB + D_ad_cam_loss_B) + self.adv_weight * D_loss_pnalty_B
 
             Discriminator_loss = D_loss_A + D_loss_B
             Discriminator_loss.backward()
@@ -244,42 +242,28 @@ class QSGAN(object) :
             # Update G
             self.G_optim.zero_grad()
 
-            _,  _,  _,  _, _, real_A_z = self.disA(real_A)
-            _,  _,  _,  _, _, real_B_z = self.disB(real_B)
+            real_A_x1, real_A_x2, real_A_x3,real_LA_logit,real_GA_logit, real_A_z = self.disA(real_A)
+            real_B_x1, real_B_x2, real_B_x3,real_LB_logit,real_GB_logit, real_B_z = self.disB(real_B)
 
-            fake_A2B = self.gen2B(real_A_z)
-            fake_B2A = self.gen2A(real_B_z)
+            fake_A2B = self.gen2B(real_A, real_A_z, real_A_x1, real_A_x2, real_A_x3)
+            fake_B2A = self.gen2A(real_B, real_B_z, real_B_x1, real_B_x2, real_B_x3)
 
-            fake_LA_logit, fake_MA_logit, fake_GA_logit, fake_A_cam_logit, _, fake_A_z = self.disA(fake_B2A)
-            fake_LB_logit, fake_MB_logit, fake_GB_logit, fake_B_cam_logit, _, fake_B_z = self.disB(fake_A2B)
-            
-            fake_B2A2B = self.gen2B(fake_A_z)
-            fake_A2B2A = self.gen2A(fake_B_z)
+            fake_B2A_x1, fake_B2A_x2, fake_B2A_x3, fake_LA_logit,fake_GA_logit, fake_A_z = self.disA(fake_B2A)
+            fake_A2B_x1, fake_A2B_x2, fake_A2B_x3, fake_LB_logit,fake_GB_logit, fake_B_z = self.disB(fake_A2B)
+
+            fake_B2A2B = self.gen2B(fake_A_z, fake_A_z, real_A_x1, real_A_x2, real_A_x3)
+            fake_A2B2A = self.gen2A(fake_B_z, fake_B_z, real_B_x1, real_B_x2, real_B_x3)
 
             G_ad_loss_GA = self.MSE_loss(fake_GA_logit, torch.ones_like(fake_GA_logit).to(self.device))
-            G_ad_loss_MA = self.MSE_loss(fake_MA_logit, torch.ones_like(fake_MA_logit).to(self.device))
             G_ad_loss_LA = self.MSE_loss(fake_LA_logit, torch.ones_like(fake_LA_logit).to(self.device))
             G_ad_loss_GB = self.MSE_loss(fake_GB_logit, torch.ones_like(fake_GB_logit).to(self.device))
-            G_ad_loss_MB = self.MSE_loss(fake_MB_logit, torch.ones_like(fake_MB_logit).to(self.device))
             G_ad_loss_LB = self.MSE_loss(fake_LB_logit, torch.ones_like(fake_LB_logit).to(self.device))
-
-            G_ad_cam_loss_A = self.MSE_loss(fake_A_cam_logit, torch.ones_like(fake_A_cam_logit).to(self.device))
-            G_ad_cam_loss_B = self.MSE_loss(fake_B_cam_logit, torch.ones_like(fake_B_cam_logit).to(self.device))
 
             G_cycle_loss_A = self.L1_loss(fake_A2B2A, real_A)
             G_cycle_loss_B = self.L1_loss(fake_B2A2B, real_B)
 
-            fake_A2A = self.gen2A(real_A_z)
-            fake_B2B = self.gen2B(real_B_z)
-
-            G_recon_loss_A = self.L1_loss(fake_A2A, real_A)
-            G_recon_loss_B = self.L1_loss(fake_B2B, real_B)
-            
-            G_feature_loss_A = self.L1_loss(real_A_z, fake_B_z) + (0.01 * self.L1_loss(real_B_z, fake_B_z))
-            G_feature_loss_B = self.L1_loss(real_B_z, fake_A_z) + (0.01 * self.L1_loss(real_A_z, fake_A_z))
-
-            G_loss_A = self.adv_weight * (G_ad_loss_GA + G_ad_loss_MA + G_ad_cam_loss_A + G_ad_loss_LA ) + self.cycle_weight * G_cycle_loss_A + self.recon_weight * G_recon_loss_A + self.feature_weight * G_feature_loss_A
-            G_loss_B = self.adv_weight * (G_ad_loss_GB + G_ad_loss_MB + G_ad_cam_loss_B + G_ad_loss_LB ) + self.cycle_weight * G_cycle_loss_B + self.recon_weight * G_recon_loss_B + self.feature_weight * G_feature_loss_B
+            G_loss_A = self.adv_weight * (G_ad_loss_GA + G_ad_loss_MA + G_ad_cam_loss_A + G_ad_loss_LA ) + self.cycle_weight * G_cycle_loss_A
+            G_loss_B = self.adv_weight * (G_ad_loss_GB + G_ad_loss_MB + G_ad_cam_loss_B + G_ad_loss_LB ) + self.cycle_weight * G_cycle_loss_B
 
             Generator_loss = G_loss_A + G_loss_B
             Generator_loss.backward()
@@ -347,17 +331,17 @@ class QSGAN(object) :
                     real_A, real_B = real_A.to('cpu'), real_B.to('cpu')
                     # real_A, real_B = real_A.to(self.device), real_B.to(self.device)
                     
-                    _, _, _,  _, A_heatmap, real_A_z= self.disA(real_A)
-                    _, _, _,  _, B_heatmap, real_B_z= self.disB(real_B)
+                    real_A2B_x1, real_A2B_x2, real_A2B_x3,  _, _, real_A_z= self.disA(real_A)
+                    real_B2A_x1, real_B2A_x2, real_B2A_x3,  _, _, real_B_z= self.disB(real_B)
 
-                    fake_A2B = self.gen2B(real_A_z)
-                    fake_B2A = self.gen2A(real_B_z)
+                    fake_A2B = self.gen2B(real_A, real_A_z, real_A2B_x1, real_A2B_x2, real_A2B_x3)
+                    fake_B2A = self.gen2A(real_B, real_B_z, real_B2A_x1, real_B2A_x2, real_B2A_x3)
 
-                    _, _, _,  _,  _,  fake_A_z = self.disA(fake_B2A)
-                    _, _, _,  _,  _,  fake_B_z = self.disB(fake_A2B)
+                    fake_A2B_x1, fake_A2B_x2, fake_A2B_x3,  _,  _,  fake_A_z = self.disA(fake_B2A)
+                    fake_B2A_x1, fake_B2A_x2, fake_B2A_x3,  _,  _,  fake_B_z = self.disB(fake_A2B)
 
-                    fake_B2A2B = self.gen2B(fake_A_z)
-                    fake_A2B2A = self.gen2A(fake_B_z)
+                    fake_B2A2B = self.gen2B(fake_B2A, fake_A_z, fake_A2B_x1, fake_A2B_x2, fake_A2B_x3)
+                    fake_A2B2A = self.gen2A(fake_A2B, fake_B_z, fake_B2A_x1, fake_B2A_x2, fake_B2A_x3)
 
                     fake_A2A = self.gen2A(real_A_z)
                     fake_B2B = self.gen2B(real_B_z)
@@ -425,6 +409,23 @@ class QSGAN(object) :
                 
                 self.gen2B.train(), self.gen2A.train(), self.disA.train(), self.disB.train()
 
+    def cal_gradient_penalty(x, A=True):
+        constant = 1.0
+        x.requires_grad_(True)
+        if A:
+            _, _, _, out1, out2, _ = self.disA(x)
+        else:
+            _, _, _, out1, out2, _ = self.disB(x)
+        #y = model(x)
+        #using torch.autograd.grad
+        gradients1 = torch.autograd.grad(out1, x, retain_graph=True, grad_outputs=torch.ones_like(out1))[0] 
+        gradients1 = gradients[0].view(x.size(0), -1)
+        gradients2 = torch.autograd.grad(out2, x, retain_graph=True, grad_outputs=torch.ones_like(out2))[0] 
+        gradients2 = gradients[0].view(x.size(0), -1)
+        gradient_penalty1 = (((gradients1 + 1e-16).norm(2, dim=1) - constant) ** 2).mean()
+        gradient_penalty2 = (((gradients2 + 1e-16).norm(2, dim=1) - constant) ** 2).mean()
+        return gradient_penalty1+gradient_penalty2
+    
     def save(self, dir, step):
         params = {}
         params['gen2B'] = self.gen2B.state_dict()
