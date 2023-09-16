@@ -68,16 +68,7 @@ class Attention(nn.Module):
         self.scale = qk_scale or head_dim ** -0.5
         self.sr_ratio=sr_ratio
         if sr_ratio>1:
-            if mask is None:
-                self.sr = nn.Conv2d(dim, dim, kernel_size=sr_ratio, stride=sr_ratio)
-                self.norm = nn.LayerNorm(dim)
-                self.act = nn.GELU()
-
-                self.q1 = nn.Linear(dim, dim//2, bias=qkv_bias)
-                self.kv1 = nn.Linear(dim, dim, bias=qkv_bias)
-                self.q2 = nn.Linear(dim, dim // 2, bias=qkv_bias)
-                self.kv2 = nn.Linear(dim, dim, bias=qkv_bias)
-            else:
+            if mask:
                 self.q = nn.Linear(dim, dim, bias=qkv_bias)
                 self.kv1 = nn.Linear(dim, dim, bias=qkv_bias)
                 self.kv2 = nn.Linear(dim, dim, bias=qkv_bias)
@@ -93,6 +84,17 @@ class Attention(nn.Module):
                 self.f2 = nn.Linear(r2, 1)
                 if r3 is not None:
                     self.f3 = nn.Linear(r3, 1)
+                    
+            else:
+                self.sr = nn.Conv2d(dim, dim, kernel_size=sr_ratio, stride=sr_ratio)
+                self.norm = nn.LayerNorm(dim)
+                self.act = nn.GELU()
+
+                self.q1 = nn.Linear(dim, dim//2, bias=qkv_bias)
+                self.kv1 = nn.Linear(dim, dim, bias=qkv_bias)
+                self.q2 = nn.Linear(dim, dim // 2, bias=qkv_bias)
+                self.kv2 = nn.Linear(dim, dim, bias=qkv_bias)
+                
         else:
             self.q = nn.Linear(dim, dim, bias=qkv_bias)
             self.kv = nn.Linear(dim, dim * 2, bias=qkv_bias)
