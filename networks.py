@@ -18,14 +18,13 @@ class ResnetGenerator(nn.Module):
         self.light = light
 
         # Bottleneck
-        self.inv1 = Inv2d(channels=291, kernel_size=3, stride=1) # channel+k+3 => channel=256, k=32, 291 => channel=128, k=64, 195
-        self.inv2 = Inv2d(channels=291, kernel_size=3, stride=1) 
-        self.inv3 = Inv2d(channels=291, kernel_size=3, stride=1) 
-        self.inv4 = Inv2d(channels=291, kernel_size=3, stride=1) 
-        self.inv5 = Inv2d(channels=291, kernel_size=3, stride=1) 
+        self.inv1 = Inv2d(channels=256, kernel_size=3, stride=1) # channel+k+3 => channel=256, k=32, 291 => channel=128, k=64, 195
+        self.inv2 = Inv2d(channels=256, kernel_size=3, stride=1) 
+        self.inv3 = Inv2d(channels=256, kernel_size=3, stride=1) 
+        self.inv4 = Inv2d(channels=256, kernel_size=3, stride=1) 
+        self.inv5 = Inv2d(channels=256, kernel_size=3, stride=1) 
 
-        self.sgt1 = Block(dim, mask, num_heads, mlp_ratio=4., qkv_bias=False, qk_scale=None, drop=0., attn_drop=0.,
-                 drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, sr_ratio=1, linear=False)
+        self.sgt1 = 
 
         self.SGfomer1 = 
         # Up-Sampling
@@ -114,24 +113,26 @@ class ResnetGenerator(nn.Module):
         self.conv_block1 = nn.Sequential(*conv_block1)
         self.mult = 4
 
-    def forward(self, input, z):
-        x = z
+    def forward(self, input, z, x1, x2, x3):
+        #x = z
+        _, _, H, W= z.shape
         # calcuator SVD in input
         S = torch.linalg.svdvals(input)
-        K = 32
+        c1 = torch.matmul(torch.reshape(S[0,0:H,0], (H,1)), torch.reshape(S[0,0:H,1], (1,H)))
+        c2 = torch.matmul(torch.reshape(S[0,0:H,1], (H,1)), torch.reshape(S[0,0:H,2], (1,H)))
+        c3 = torch.matmul(torch.reshape(S[0,0:H,0], (H,1)), torch.reshape(S[0,0:H,2], (1,H)))
+        c4 = torch.matmul(torch.reshape(c1, (H, H, 1)), torch.reshape(S[0,0:H,2], (1, 1, H)))
         
-        c1 = torch.matmul(torch.reshape(S[0,0:K,0], (K,1)), torch.reshape(S[0,0:K,1], (1,K)))
-        c2 = torch.matmul(torch.reshape(S[0,0:K,1], (K,1)), torch.reshape(S[0,0:K,2], (1,K)))
-        c3 = torch.matmul(torch.reshape(S[0,0:K,0], (K,1)), torch.reshape(S[0,0:K,2], (1,K)))
-        c4 = torch.matmul(torch.reshape(c1, (K, K, 1)), torch.reshape(S[0,0:K,2], (1, 1, K)))
-        
-        svd = torch.cat((torch.reshape(c1, (1,1,K,K)),torch.reshape(c2, (1,1,K,K)),torch.reshape(c3, (1,1,K,K))), dim=1)
-        svd = torch.cat((svd,torch.reshape(c4, (1,K,K,K))), dim=1)
+        svd = torch.cat((torch.reshape(c1, (1,1,H,H)),torch.reshape(c2, (1,1,H,H)),torch.reshape(c3, (1,1,H,H))), dim=1)
+        svd = torch.cat((svd,torch.reshape(c4, (1,H,H,H))), dim=1)
 
         # concatenate SVD and Encoder
-        x = torch.cat((x,svd), dim=1) # (1, k+3, k, k) + (1 ,256, k, k) = (1, 256+k+3, k, k) 
+        x = torch.cat((z,svd), dim=1) # (1, k+3, k, k) + (1 ,256-k-3, k, k) = (1, 256, k, k)
+        _, C, H, W= x.shape
 
         # Bottleneck
+        x = Block(c, mask= None, num_heads, mlp_ratio=4., qkv_bias=False, qk_scale=None, drop=0., attn_drop=0.,
+                 drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, sr_ratio=1, linear=False)
 
 
         # Up-Sampling
@@ -344,20 +345,20 @@ class Discriminator(nn.Module):
         
         enc2 = [nn.ReflectionPad2d(1),
                  nn.utils.spectral_norm(
-                 nn.Conv2d(ndf, ndf, kernel_size=3, stride=2, padding=0, bias=True)),
-                 nn.GELU()]
-        enc2 += [nn.utils.spectral_norm(nn.Conv2d(ndf, ndf, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU(),
-                 torch.fft.fft2(),
-                 nn.utils.spectral_norm(nn.Conv2d(ndf, ndf, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU(),
-                 torch.fft.ifft2(),  nn.Conv2d(ndf, ndf, kernel_size=1, stride=1, bias=True)]
-        enc3 = [nn.ReflectionPad2d(1),
-                 nn.utils.spectral_norm(
                  nn.Conv2d(ndf, ndf*2, kernel_size=3, stride=2, padding=0, bias=True)),
                  nn.GELU()]
-        enc1 += [nn.utils.spectral_norm(nn.Conv2d(ndf*2, ndf*2, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU(),
+        enc2 += [nn.utils.spectral_norm(nn.Conv2d(ndf*2, ndf*2, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU(),
                  torch.fft.fft2(),
                  nn.utils.spectral_norm(nn.Conv2d(ndf*2, ndf*2, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU(),
                  torch.fft.ifft2(),  nn.Conv2d(ndf*2, ndf*2, kernel_size=1, stride=1, bias=True)]
+        enc3 = [nn.ReflectionPad2d(1),
+                 nn.utils.spectral_norm(
+                 nn.Conv2d(ndf*2, ndf*4, kernel_size=3, stride=2, padding=0, bias=True)),
+                 nn.GELU()]
+        enc3 += [nn.utils.spectral_norm(nn.Conv2d(ndf*4, ndf*4, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU(),
+                 torch.fft.fft2(),
+                 nn.utils.spectral_norm(nn.Conv2d(ndf*4, ndf*4, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU(),
+                 torch.fft.ifft2(),  nn.Conv2d(ndf*4, ndf*4, kernel_size=1, stride=1, bias=True)]
         #enc4 = [nn.ReflectionPad2d(1),
                  nn.utils.spectral_norm(
                  nn.Conv2d(ndf*2, ndf*4, kernel_size=3, stride=2, padding=0, bias=True)),
@@ -383,21 +384,24 @@ class Discriminator(nn.Module):
                       nn.nn.GELU()]
         Dis2 = [nn.ReflectionPad2d(1),
                       nn.utils.spectral_norm(
-                      nn.Conv2d(ndf*2, ndf*2, kernel_size=4, stride=2, padding=0, bias=True)),
+                      nn.Conv2d(ndf*4, ndf*4, kernel_size=4, stride=2, padding=0, bias=True)),
                       nn.LeakyReLU(0.2, True),
                       nn.ReflectionPad2d(1),
                       nn.utils.spectral_norm(
-                      nn.Conv2d(ndf*2, ndf*4, kernel_size=4, stride=2, padding=0, bias=True)),
+                      nn.Conv2d(ndf*8, ndf*8, kernel_size=4, stride=2, padding=0, bias=True)),
                       nn.LeakyReLU(0.2, True),
                       nn.ReflectionPad2d(1),
                       nn.utils.spectral_norm(
-                      nn.Conv2d(ndf*4, ndf*8, kernel_size=4, stride=2, padding=0, bias=True)),
+                      nn.Conv2d(ndf*16, ndf*16, kernel_size=4, stride=2, padding=0, bias=True)),
                       nn.LeakyReLU(0.2, True)]
         
         self.conv1 = nn.utils.spectral_norm(   #1+3*2^0 + 3*2^1 + 3*2^2 +3*2^3 + 3*2^3= 70
             nn.Conv2d(ndf*4, 1, kernel_size=4, stride=1, padding=0, bias=False))
         self.conv2 = nn.utils.spectral_norm(
-            nn.Conv2d(ndf*8, 1, kernel_size=4, stride=1, padding=0, bias=False))
+            nn.Conv2d(ndf*16, 1, kernel_size=4, stride=1, padding=0, bias=False))
+
+        self.convz = nn.utils.spectral_norm(
+            nn.Conv2d(ndf*4, (ndf*4-(ndf+3)), kernel_size=4, stride=1, padding=0, bias=False))
         
 
         self.pad = nn.ReflectionPad2d(1)
@@ -416,8 +420,9 @@ class Discriminator(nn.Module):
         x2 = self.enc2(x1)
         x3 = self.enc3(x2)
         #x4 = self.enc4(x3)
-        
-        z = x =  self.GELU(x3)
+
+        z = self.convz(x3)
+        z = x =  self.GELU(z)    # dimention 256-(k+3)
 
         x1 = self.Dis1(x1)
         x3 = self.Dis2(x3)
@@ -428,7 +433,7 @@ class Discriminator(nn.Module):
 
         
         # number ibput and output cheked.
-        #x2, x3, x4 for loss CT.
+        #x1, x2, x3 for loss CT.
         
-        return x2, x3, out1, out2, z
+        return x1, x2, x3, out1, out2, z
 
