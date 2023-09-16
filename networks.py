@@ -221,33 +221,33 @@ class Discriminator(nn.Module):
                  torch.fft.fft2(),
                  nn.utils.spectral_norm(nn.Conv2d(ndf*4, ndf*4, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU(),
                  torch.fft.ifft2(),  nn.Conv2d(ndf*4, ndf*4, kernel_size=1, stride=1, bias=True)]
-        self.GELU = nn.nn.GELU()
+        self.GELU = nn.GELU()
 
         #Discriminator
         Dis1 = [nn.ReflectionPad2d(1),
                       nn.utils.spectral_norm(
                       nn.Conv2d(ndf, ndf, kernel_size=4, stride=2, padding=0, bias=True)),
-                      nn.nn.GELU(),
+                      nn.GELU(),
                       nn.ReflectionPad2d(1),
                       nn.utils.spectral_norm(
                       nn.Conv2d(ndf, ndf*2, kernel_size=4, stride=2, padding=0, bias=True)),
-                      nn.nn.GELU(),
+                      nn.GELU(),
                       nn.ReflectionPad2d(1),
                       nn.utils.spectral_norm(
                       nn.Conv2d(ndf*2, ndf*4, kernel_size=4, stride=2, padding=0, bias=True)),
-                      nn.nn.GELU()]
+                      nn.GELU()]
         Dis2 = [nn.ReflectionPad2d(1),
                       nn.utils.spectral_norm(
                       nn.Conv2d(ndf*4, ndf*4, kernel_size=4, stride=2, padding=0, bias=True)),
-                      nn.LeakyReLU(0.2, True),
+                      nn.GELU(),
                       nn.ReflectionPad2d(1),
                       nn.utils.spectral_norm(
                       nn.Conv2d(ndf*8, ndf*8, kernel_size=4, stride=2, padding=0, bias=True)),
-                      nn.LeakyReLU(0.2, True),
+                      nn.GELU(),
                       nn.ReflectionPad2d(1),
                       nn.utils.spectral_norm(
                       nn.Conv2d(ndf*16, ndf*16, kernel_size=4, stride=2, padding=0, bias=True)),
-                      nn.LeakyReLU(0.2, True)]
+                      nn.GELU()]
         
         self.conv1 = nn.utils.spectral_norm(   #1+3*2^0 + 3*2^1 + 3*2^2 +3*2^3 + 3*2^3= 70
             nn.Conv2d(ndf*4, 1, kernel_size=4, stride=1, padding=0, bias=False))
