@@ -442,30 +442,20 @@ class QSGAN(object) :
         gradient_penalty2 = (((gradients2 + 1e-16).norm(2, dim=1) - constant) ** 2).mean()
         return gradient_penalty1+gradient_penalty2
 
-    class ContrastLoss(nn.Module):
-        def __init__(self, ablation=False):
-    
-            super(ContrastLoss, self).__init__()
-            self.l1 = nn.L1Loss()
-            self.weights = [1.0/32, 1.0/16, 1.0/8]
-            self.ab = ablation
-    
-        def forward(self, a, p, n):
-            a_vgg, p_vgg, n_vgg = a, p, n
-            
-            loss = 0
-    
-            d_ap, d_an = 0, 0
-            for i in range(len(a_vgg)):
-                d_ap = self.l1(a_vgg[i], p_vgg[i].detach())
-                if not self.ab:
-                    d_an = self.l1(a_vgg[i], n_vgg[i].detach())
-                    contrastive = d_ap / (d_an + 1e-7)
-                else:
-                    contrastive = d_ap
-    
-                loss += self.weights[i] * contrastive
-            return loss
+     def ContrastLoss(a, p, n):
+        loss = 0
+        tau = 0.07
+
+        d_ap, d_an = 0, 0
+        for i in range(len(a)):
+
+            d_ap = torch.exp(torch.pow((a[i] - p[i].detach()),2).mean()/tau)
+            d_an = torch.exp(torch.pow((a[i] - n[i].detach()),2).mean()/tau)
+            contrastive = - torch.log(d_ap / (d_an + d_ap))
+
+            loss += contrastive
+
+        return loss
     
     def save(self, dir, step):
         params = {}
