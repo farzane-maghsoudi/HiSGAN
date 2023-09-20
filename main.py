@@ -23,9 +23,9 @@ def parse_args():
     parser.add_argument('--lr', type=float, default=0.0001, help='The learning rate')
     parser.add_argument('--weight_decay', type=float, default=0.0001, help='The weight decay')
     parser.add_argument('--adv_weight', type=int, default=1, help='Weight for GAN')
-    parser.add_argument('--cycle_weight', type=int, default=10, help='Weight for Cycle')
-    parser.add_argument('--recon_weight', type=int, default=10, help='Weight for Reconstruction')
-    parser.add_argument('--feature_weight', type=int, default=15, help='Weight for Feature similarity')
+    parser.add_argument('--identity_weight', type=int, default=10, help='Weight for identity')
+    parser.add_argument('--penalty_weight', type=int, default=10, help='Weight for penalty')
+    parser.add_argument('--contrast_weight', type=int, default=15, help='Weight for contrast')
 
     parser.add_argument('--ch', type=int, default=64, help='base channel number per layer')
     parser.add_argument('--n_res', type=int, default=100, help='The number of resblock')
