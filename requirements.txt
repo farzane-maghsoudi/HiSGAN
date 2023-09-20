@@ -6,5 +6,3 @@ TensorboardX
 tensorflow
 thop
 involution_pytorch
---upgrade git+https://github.com/rwightman/pytorch-image-models.git
-timm
