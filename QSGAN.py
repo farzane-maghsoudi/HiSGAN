@@ -35,9 +35,9 @@ class QSGAN(object) :
 
         """ Weight """
         self.adv_weight = args.adv_weight
-        self.cycle_weight = args.cycle_weight
-        self.recon_weight = args.recon_weight
-        self.feature_weight = args.feature_weight
+        self.identity_weight = args.identity_weight
+        self.penalty_weight = args.penalty_weight
+        self.contrast_weight = args.contrast_weight
 
         """ Generator """
         self.n_res = args.n_res
@@ -121,8 +121,8 @@ class QSGAN(object) :
         """ Define Generator, Discriminator """
         self.gen2B = ResnetGenerator(input_nc=self.img_ch, output_nc=self.img_ch, ngf=self.ch, n_blocks=self.n_res, img_size=self.img_size, light=self.light).to(self.device)
         self.gen2A = ResnetGenerator(input_nc=self.img_ch, output_nc=self.img_ch, ngf=self.ch, n_blocks=self.n_res, img_size=self.img_size, light=self.light).to(self.device)
-        self.disA = Discriminator(input_nc=self.img_ch, ndf=self.ch, n_layers=self.n_dis).to(self.device)
-        self.disB = Discriminator(input_nc=self.img_ch, ndf=self.ch, n_layers=self.n_dis).to(self.device)
+        self.disA = Discriminator(input_nc=self.img_ch, ndf=self.ch).to(self.device)
+        self.disB = Discriminator(input_nc=self.img_ch, ndf=self.ch).to(self.device)
         
         print('-----------------------------------------------')
         input = torch.randn([1, self.img_ch, self.img_size, self.img_size]).to(self.device)
@@ -221,9 +221,8 @@ class QSGAN(object) :
             fake_B2A = fake_B2A.detach()
             fake_A2B = fake_A2B.detach()
 
-            fake_B2A_x1, fake_B2A_x2, fake_B2A_x3, fake_LA_logit,fake_GA_logit, fake_A_z = self.disA(fake_B2A)
             fake_A2B_x1, fake_A2B_x2, fake_A2B_x3, fake_LB_logit,fake_GB_logit, fake_B_z = self.disB(fake_A2B)
-
+            fake_B2A_x1, fake_B2A_x2, fake_B2A_x3, fake_LA_logit,fake_GA_logit, fake_A_z = self.disA(fake_B2A)
 
             D_ad_loss_GA = self.MSE_loss(real_GA_logit, torch.ones_like(real_GA_logit).to(self.device)) + self.MSE_loss(fake_GA_logit, torch.zeros_like(fake_GA_logit).to(self.device))
             D_ad_loss_LA = self.MSE_loss(real_LA_logit, torch.ones_like(real_LA_logit).to(self.device)) + self.MSE_loss(fake_LA_logit, torch.zeros_like(fake_LA_logit).to(self.device))
@@ -232,8 +231,8 @@ class QSGAN(object) :
             D_loss_pnalty_A = cal_gradient_penalty(real_A, A=True) + cal_gradient_penalty(fake_B2A, A=True)
             D_loss_pnalty_B = cal_gradient_penalty(real_B, A=False) + cal_gradient_penalty(fake_A2B, A=True)
             
-            D_loss_A = self.adv_weight * (D_ad_loss_GA + D_ad_cam_loss_A) + self.adv_weight * D_loss_pnalty_A
-            D_loss_B = self.adv_weight * (D_ad_loss_GB + D_ad_cam_loss_B) + self.adv_weight * D_loss_pnalty_B
+            D_loss_A = self.adv_weight * (D_ad_loss_GA + D_ad_loss_LA) + self.pnalty_weight * D_loss_pnalty_A
+            D_loss_B = self.adv_weight * (D_ad_loss_GB + D_ad_loss_LB) + self.pnalty_weight * D_loss_pnalty_B
 
             Discriminator_loss = D_loss_A + D_loss_B
             Discriminator_loss.backward()
@@ -242,8 +241,8 @@ class QSGAN(object) :
             # Update G
             self.G_optim.zero_grad()
 
-            real_A_x1, real_A_x2, real_A_x3,real_LA_logit,real_GA_logit, real_A_z = self.disA(real_A)
-            real_B_x1, real_B_x2, real_B_x3,real_LB_logit,real_GB_logit, real_B_z = self.disB(real_B)
+            real_A_x1, real_A_x2, real_A_x3,_,_, real_A_z = self.disA(real_A)
+            real_B_x1, real_B_x2, real_B_x3,_,_, real_B_z = self.disB(real_B)
 
             fake_A2B = self.gen2B(real_A, real_A_z, real_A_x1, real_A_x2, real_A_x3)
             fake_B2A = self.gen2A(real_B, real_B_z, real_B_x1, real_B_x2, real_B_x3)
@@ -251,19 +250,34 @@ class QSGAN(object) :
             fake_B2A_x1, fake_B2A_x2, fake_B2A_x3, fake_LA_logit,fake_GA_logit, fake_A_z = self.disA(fake_B2A)
             fake_A2B_x1, fake_A2B_x2, fake_A2B_x3, fake_LB_logit,fake_GB_logit, fake_B_z = self.disB(fake_A2B)
 
-            fake_B2A2B = self.gen2B(fake_A_z, fake_A_z, real_A_x1, real_A_x2, real_A_x3)
-            fake_A2B2A = self.gen2A(fake_B_z, fake_B_z, real_B_x1, real_B_x2, real_B_x3)
+            fake_B2A2B = self.gen2B(fake_A_z, fake_A_z, fake_B2A_x1, fake_B2A_x2, fake_B2A_x3)
+            fake_A2B2A = self.gen2A(fake_B_z, fake_B_z, fake_A2B_x1, fake_A2B_x2, fake_A2B_x3,)
+            
+            fake_A2B2A_x1, fake_A2B2A_x2, fake_A2B2A_x3, _,_, fake_A2B2A_z = self.disA(fake_A2B2A)
+            fake_B2A2B_x1, fake_B2A2B_x2, fake_B2A2B_x3, _,_, fake_B2A2B_z = self.disB(fake_B2A2B)
+
+            Ireal_B_x1, Ireal_B_x2, Ireal_B_x3,_,_, Ireal_B_z = self.disA(real_B)
+            Ireal_A_x1, Ireal_A_x2, Ireal_A_x3,_,_, Ireal_A_z = self.disB(real_A)
+
+            fake_A2A = self.gen2A(real_A, Ireal_A_z, Ireal_A_x1, Ireal_A_x2, Ireal_A_x3)
+            fake_B2B = self.gen2B(real_B, Ireal_B_z, Ireal_B_x1, Ireal_B_x2, Ireal_B_x3)
 
             G_ad_loss_GA = self.MSE_loss(fake_GA_logit, torch.ones_like(fake_GA_logit).to(self.device))
             G_ad_loss_LA = self.MSE_loss(fake_LA_logit, torch.ones_like(fake_LA_logit).to(self.device))
             G_ad_loss_GB = self.MSE_loss(fake_GB_logit, torch.ones_like(fake_GB_logit).to(self.device))
             G_ad_loss_LB = self.MSE_loss(fake_LB_logit, torch.ones_like(fake_LB_logit).to(self.device))
 
-            G_cycle_loss_A = self.L1_loss(fake_A2B2A, real_A)
-            G_cycle_loss_B = self.L1_loss(fake_B2A2B, real_B)
+            G_Contrast_Loss_A = ContrastLoss([fake_A2B2A_x1, fake_A2B2A_x2, fake_A2B2A_x3], [real_A_x1, real_A_x2, real_A_x3], [fake_A2B_x1, fake_A2B_x2, fake_A2B_x3])
+            G_Contrast_Loss_B = ContrastLoss([fake_B2A2B_x1, fake_B2A2B_x2, fake_B2A2B_x3], [real_B_x1, real_B_x2, real_B_x3], [fake_B2A_x1, fake_B2A_x2, fake_B2A_x3])
 
-            G_loss_A = self.adv_weight * (G_ad_loss_GA + G_ad_loss_MA + G_ad_cam_loss_A + G_ad_loss_LA ) + self.cycle_weight * G_cycle_loss_A
-            G_loss_B = self.adv_weight * (G_ad_loss_GB + G_ad_loss_MB + G_ad_cam_loss_B + G_ad_loss_LB ) + self.cycle_weight * G_cycle_loss_B
+            #G_cycle_loss_A = self.L1_loss(fake_A2B2A, real_A)
+            #G_cycle_loss_B = self.L1_loss(fake_B2A2B, real_B)
+
+            G_identity_loss_A = self.L1_loss(fake_A2A, real_A)
+            G_identity_loss_B = self.L1_loss(fake_B2B, real_B)
+
+            G_loss_A = self.adv_weight * (G_ad_loss_GA + G_ad_loss_LA ) + self.Contrast_weight * G_Contrast_Loss_A + self.identity_weight * G_identity_loss_A
+            G_loss_B = self.adv_weight * (G_ad_loss_GB + G_ad_loss_LB ) + self.Contrast_weight * G_Contrast_Loss_B + self.identity_weight * G_identity_loss_B
 
             Generator_loss = G_loss_A + G_loss_B
             Generator_loss.backward()
@@ -343,17 +357,18 @@ class QSGAN(object) :
                     fake_B2A2B = self.gen2B(fake_B2A, fake_A_z, fake_A2B_x1, fake_A2B_x2, fake_A2B_x3)
                     fake_A2B2A = self.gen2A(fake_A2B, fake_B_z, fake_B2A_x1, fake_B2A_x2, fake_B2A_x3)
 
-                    fake_A2A = self.gen2A(real_A_z)
-                    fake_B2B = self.gen2B(real_B_z)
+                    Ireal_B_x1, Ireal_B_x2, Ireal_B_x3,_,_, Ireal_B_z = self.disA(real_B)
+                    Ireal_A_x1, Ireal_A_x2, Ireal_A_x3,_,_, Ireal_A_z = self.disB(real_A)
+        
+                    fake_A2A = self.gen2A(real_A, Ireal_A_z, Ireal_A_x1, Ireal_A_x2, Ireal_A_x3)
+                    fake_B2B = self.gen2B(real_B, Ireal_B_z, Ireal_B_x1, Ireal_B_x2, Ireal_B_x3)
 
                     A2B = np.concatenate((A2B, np.concatenate((RGB2BGR(tensor2numpy(denorm(real_A[0]))),
-                                                               cam(tensor2numpy(A_heatmap[0]), self.img_size),
                                                                RGB2BGR(tensor2numpy(denorm(fake_A2A[0]))),
                                                                RGB2BGR(tensor2numpy(denorm(fake_A2B[0]))),
                                                                RGB2BGR(tensor2numpy(denorm(fake_A2B2A[0])))), 0)), 1)
 
                     B2A = np.concatenate((B2A, np.concatenate((RGB2BGR(tensor2numpy(denorm(real_B[0]))),
-                                                               cam(tensor2numpy(B_heatmap[0]), self.img_size),
                                                                RGB2BGR(tensor2numpy(denorm(fake_B2B[0]))),
                                                                RGB2BGR(tensor2numpy(denorm(fake_B2A[0]))),
                                                                RGB2BGR(tensor2numpy(denorm(fake_B2A2B[0])))), 0)), 1)
@@ -373,29 +388,30 @@ class QSGAN(object) :
                     real_A, real_B = real_A.to('cpu'), real_B.to('cpu')
                     # real_A, real_B = real_A.to(self.device), real_B.to(self.device)
 
-                    _, _, _,  _, A_heatmap, real_A_z= self.disA(real_A)
-                    _, _, _,  _, B_heatmap, real_B_z= self.disB(real_B)
+                    real_A2B_x1, real_A2B_x2, real_A2B_x3,  _, _, real_A_z= self.disA(real_A)
+                    real_B2A_x1, real_B2A_x2, real_B2A_x3,  _, _, real_B_z= self.disB(real_B)
 
-                    fake_A2B = self.gen2B(real_A_z)
-                    fake_B2A = self.gen2A(real_B_z)
+                    fake_A2B = self.gen2B(real_A, real_A_z, real_A2B_x1, real_A2B_x2, real_A2B_x3)
+                    fake_B2A = self.gen2A(real_B, real_B_z, real_B2A_x1, real_B2A_x2, real_B2A_x3)
 
-                    _, _, _,  _,  _,  fake_A_z = self.disA(fake_B2A)
-                    _, _, _,  _,  _,  fake_B_z = self.disB(fake_A2B)
+                    fake_A2B_x1, fake_A2B_x2, fake_A2B_x3,  _,  _,  fake_A_z = self.disA(fake_B2A)
+                    fake_B2A_x1, fake_B2A_x2, fake_B2A_x3,  _,  _,  fake_B_z = self.disB(fake_A2B)
 
-                    fake_B2A2B = self.gen2B(fake_A_z)
-                    fake_A2B2A = self.gen2A(fake_B_z)
+                    fake_B2A2B = self.gen2B(fake_B2A, fake_A_z, fake_A2B_x1, fake_A2B_x2, fake_A2B_x3)
+                    fake_A2B2A = self.gen2A(fake_A2B, fake_B_z, fake_B2A_x1, fake_B2A_x2, fake_B2A_x3)
 
-                    fake_A2A = self.gen2A(real_A_z)
-                    fake_B2B = self.gen2B(real_B_z)
+                    Ireal_B_x1, Ireal_B_x2, Ireal_B_x3,_,_, Ireal_B_z = self.disA(real_B)
+                    Ireal_A_x1, Ireal_A_x2, Ireal_A_x3,_,_, Ireal_A_z = self.disB(real_A)
+        
+                    fake_A2A = self.gen2A(real_A, Ireal_A_z, Ireal_A_x1, Ireal_A_x2, Ireal_A_x3)
+                    fake_B2B = self.gen2B(real_B, Ireal_B_z, Ireal_B_x1, Ireal_B_x2, Ireal_B_x3)
 
                     A2B = np.concatenate((A2B, np.concatenate((RGB2BGR(tensor2numpy(denorm(real_A[0]))),
-                                                               cam(tensor2numpy(A_heatmap[0]), self.img_size),
                                                                RGB2BGR(tensor2numpy(denorm(fake_A2A[0]))),
                                                                RGB2BGR(tensor2numpy(denorm(fake_A2B[0]))),
                                                                RGB2BGR(tensor2numpy(denorm(fake_A2B2A[0])))), 0)), 1)
 
                     B2A = np.concatenate((B2A, np.concatenate((RGB2BGR(tensor2numpy(denorm(real_B[0]))),
-                                                               cam(tensor2numpy(B_heatmap[0]), self.img_size),
                                                                RGB2BGR(tensor2numpy(denorm(fake_B2B[0]))),
                                                                RGB2BGR(tensor2numpy(denorm(fake_B2A[0]))),
                                                                RGB2BGR(tensor2numpy(denorm(fake_B2A2B[0])))), 0)), 1)
@@ -425,6 +441,31 @@ class QSGAN(object) :
         gradient_penalty1 = (((gradients1 + 1e-16).norm(2, dim=1) - constant) ** 2).mean()
         gradient_penalty2 = (((gradients2 + 1e-16).norm(2, dim=1) - constant) ** 2).mean()
         return gradient_penalty1+gradient_penalty2
+
+    class ContrastLoss(nn.Module):
+        def __init__(self, ablation=False):
+    
+            super(ContrastLoss, self).__init__()
+            self.l1 = nn.L1Loss()
+            self.weights = [1.0/32, 1.0/16, 1.0/8]
+            self.ab = ablation
+    
+        def forward(self, a, p, n):
+            a_vgg, p_vgg, n_vgg = a, p, n
+            
+            loss = 0
+    
+            d_ap, d_an = 0, 0
+            for i in range(len(a_vgg)):
+                d_ap = self.l1(a_vgg[i], p_vgg[i].detach())
+                if not self.ab:
+                    d_an = self.l1(a_vgg[i], n_vgg[i].detach())
+                    contrastive = d_ap / (d_an + 1e-7)
+                else:
+                    contrastive = d_ap
+    
+                loss += self.weights[i] * contrastive
+            return loss
     
     def save(self, dir, step):
         params = {}
@@ -466,8 +507,8 @@ class QSGAN(object) :
         self.gen2B.eval(), self.gen2A.eval(), self.disA.eval(),self.disB.eval()
         for n, (real_A, real_A_path) in enumerate(self.testA_loader):
             real_A = real_A.to(self.device)
-            _, _, _,  _, _, real_A_z= self.disA(real_A)
-            fake_A2B = self.gen2B(real_A_z)
+            real_A2B_x1, real_A2B_x2, real_A2B_x3,  _, _, real_A_z= self.disA(real_A)
+            fake_A2B = self.gen2B(real_A, real_A_z, real_A2B_x1, real_A2B_x2, real_A2B_x3)
 
             A2B = RGB2BGR(tensor2numpy(denorm(fake_A2B[0])))
             print(real_A_path[0])
@@ -475,8 +516,9 @@ class QSGAN(object) :
 
         for n, (real_B, real_B_path) in enumerate(self.testB_loader):
             real_B = real_B.to(self.device)
-            _, _, _,  _, _, real_B_z= self.disB(real_B)
-            fake_B2A = self.gen2A(real_B_z)
+
+            real_B2A_x1, real_B2A_x2, real_B2A_x3,  _, _, real_B_z= self.disB(real_B)
+            fake_B2A = self.gen2A(real_B, real_B_z, real_B2A_x1, real_B2A_x2, real_B2A_x3)
 
             B2A = RGB2BGR(tensor2numpy(denorm(fake_B2A[0])))
             print(real_B_path[0])
