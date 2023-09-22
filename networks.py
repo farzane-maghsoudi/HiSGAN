@@ -109,9 +109,9 @@ class ResnetGenerator(nn.Module):
         self.SGfomer6 = Block(C, mask= True, num_heads=8, mlp_ratio=4., qkv_bias=True, qk_scale=False, drop=0., attn_drop=0.,
                  drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, sr_ratio=1, linear=False)
         #self.SGfomer7 = Block(C, mask= False, num_heads=8, mlp_ratio=4., qkv_bias=True, qk_scale=False, drop=0., attn_drop=0.,
-                 drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, sr_ratio=1, linear=False)
+        #         drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, sr_ratio=1, linear=False)
         #self.SGfomer8 = Block(C, mask= True, num_heads=8, mlp_ratio=4., qkv_bias=True, qk_scale=False, drop=0., attn_drop=0.,
-                 drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, sr_ratio=1, linear=False)  # sr_ratio=4 deleted
+        #         drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, sr_ratio=1, linear=False)  # sr_ratio=4 deleted
  
         # Up-Sampling
         self.dec0 = [nn.ReflectionPad2d(1),   
@@ -214,13 +214,13 @@ class Discriminator(nn.Module):
                  nn.utils.spectral_norm(nn.Conv2d(ndf*4, ndf*4, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU(),
                  torch.fft.ifft2(),  nn.Conv2d(ndf*4, ndf*4, kernel_size=1, stride=1, bias=True)]
         #enc4 = [nn.ReflectionPad2d(1),
-                 nn.utils.spectral_norm(
-                 nn.Conv2d(ndf*2, ndf*4, kernel_size=3, stride=2, padding=0, bias=True)),
-                 nn.GELU()]
+        #         nn.utils.spectral_norm(
+        #         nn.Conv2d(ndf*2, ndf*4, kernel_size=3, stride=2, padding=0, bias=True)),
+        #         nn.GELU()]
         #enc4 += [nn.utils.spectral_norm(nn.Conv2d(ndf*4, ndf*4, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU(),
-                 torch.fft.fft2(),
-                 nn.utils.spectral_norm(nn.Conv2d(ndf*4, ndf*4, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU(),
-                 torch.fft.ifft2(),  nn.Conv2d(ndf*4, ndf*4, kernel_size=1, stride=1, bias=True)]
+        #         torch.fft.fft2(),
+        #         nn.utils.spectral_norm(nn.Conv2d(ndf*4, ndf*4, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU(),
+        #         torch.fft.ifft2(),  nn.Conv2d(ndf*4, ndf*4, kernel_size=1, stride=1, bias=True)]
         self.GELU = nn.GELU()
 
         #Discriminator
