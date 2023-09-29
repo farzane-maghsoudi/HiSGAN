@@ -129,7 +129,7 @@ class ResnetGenerator(nn.Module):
                          adaILN(ndf),
                          nn.GELU]
         self.dec1 = [nn.ReflectionPad2d(1),   
-                         nn.Conv2d(ngf*2, ngf), kernel_size=3, stride=1, padding=0, bias=False),
+                         nn.Conv2d(ngf, ngf), kernel_size=3, stride=1, padding=0, bias=False),
                          adaILN(ndf),
                          nn.GELU,
                          nn.ReflectionPad2d(3),
