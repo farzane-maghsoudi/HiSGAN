@@ -86,9 +86,9 @@ class QSGAN(object) :
 
         print("##### Weight #####")
         print("# adv_weight : ", self.adv_weight)
-        print("# cycle_weight : ", self.cycle_weight)
-        print("# recon_weight : ", self.recon_weight)
-        print("# feature_weight : ", self.feature_weight)
+        print("# identity_weight : ", self.identity_weight)
+        print("# penalty_weight : ", self.penalty_weight)
+        print("# contrast_weight : ", self.contrast_weight)
 
     ##################################################################################
     # Model
