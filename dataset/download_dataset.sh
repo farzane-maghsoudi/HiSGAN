@@ -12,9 +12,9 @@ if [[ $FILE == "cityscapes" ]]; then
 fi
 
 URL=https://efrosgans.eecs.berkeley.edu/cyclegan/datasets/$FILE.zip
-ZIP_FILE=./datasets/$FILE.zip
-TARGET_DIR=./datasets/$FILE/
+ZIP_FILE=./dataset/$FILE.zip
+TARGET_DIR=./dataset/$FILE/
 wget -N $URL -O $ZIP_FILE
 mkdir $TARGET_DIR
-unzip $ZIP_FILE -d ./datasets/
+unzip $ZIP_FILE -d ./dataset/
 rm $ZIP_FILE
