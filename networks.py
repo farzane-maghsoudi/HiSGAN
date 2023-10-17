@@ -63,21 +63,21 @@ class ResnetGenerator(nn.Module):
         # Up-Sampling
         self.dec0 = [nn.ReflectionPad2d(1),   
                          nn.Conv2d(ngf*4, ngf*4, kernel_size=3, stride=1, padding=0, bias=False),
-                         adaILN(ngf*4),
+                         ILN(ngf*4),
                          nn.GELU]
         self.dec3 = [nn.ReflectionPad2d(1),   
                          nn.Conv2d(ngf*8, ngf*8, kernel_size=3, stride=1, padding=0, bias=False),
                          nn.PixelShuffle(2),
-                         adaILN(ngf*2),
+                         ILN(ngf*2),
                          nn.GELU]
         self.dec2 = [nn.ReflectionPad2d(1),   
                          nn.Conv2d(ngf*4, ngf*4, kernel_size=3, stride=1, padding=0, bias=False),
                          nn.PixelShuffle(2),
-                         adaILN(ngf),
+                         ILN(ngf),
                          nn.GELU]
         self.dec1 = [nn.ReflectionPad2d(1),   
                          nn.Conv2d(ngf, ngf, kernel_size=3, stride=1, padding=0, bias=False),
-                         adaILN(ngf),
+                         ILN(ngf),
                          nn.GELU,
                          nn.ReflectionPad2d(3),
                          nn.Conv2d(ngf, output_nc, kernel_size=7, stride=1, padding=0, bias=False),
@@ -101,13 +101,15 @@ class ResnetGenerator(nn.Module):
         _, C, H, W= x.shape
 
 
-        # Bottleneck
+        # computation gamma, beta
         if self.light:
             xx_ = torch.nn.functional.adaptive_avg_pool2d(x, 1)
             xx_ = self.FC(xx_.view(xx_.shape[0], -1))
         else:
             xx_ = self.FC(x.view(x.shape[0], -1))
         gamma, beta = self.gamma(xx_), self.beta(xx_)
+        
+        # Bottleneck
         mask = None
         x, mask = self.SGfomer1(x, H, W, mask, gamma, beta)
         x = self.inv1(x)
