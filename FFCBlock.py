@@ -142,7 +142,7 @@ class FourierUnit(nn.Module):
 
 class FFC(nn.Module):
 
-    def __init__(self, in_channels=256, out_channels=256, stride=1, groups=1, enable_lfu=True, separable_fu=False, **fu_kwargs):
+    def __init__(self, in_channels, out_channels, stride=1, groups=1, enable_lfu=True, separable_fu=False, **fu_kwargs):
         # bn_layer not used
         super(FFC, self).__init__()
         self.enable_lfu = enable_lfu
