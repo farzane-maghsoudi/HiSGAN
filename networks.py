@@ -86,6 +86,7 @@ class ResnetGenerator(nn.Module):
         x = torch.cat((z,svd), dim=1) # (1, k+3, k, k) + (1 ,256-k-3, k, k) = (1, 256, k, k)
         _, C, H, W= x.shape
 
+
         # Bottleneck
         mask = None
         x, mask = self.SGfomer1(x, H, W, mask)
