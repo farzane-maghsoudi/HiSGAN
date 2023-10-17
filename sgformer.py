@@ -132,7 +132,7 @@ class Attention(nn.Module):
                 q1 = self.q1(x).reshape(B_, N, self.num_heads//2, C // self.num_heads).permute(0, 2, 1, 3)
                 x_ = x.permute(2, 0, 1).reshape(B, C, H, W)
                 x_1 = self.sr(x_).reshape(C, B_//self.sr_ratio,N//self.sr_ratio).permute(1,2,0)
-                x_1 = self.act(self.norm(x_1))
+                x_1 = self.act(self.norm(x_1, gamma, beta))
                 kv1 = self.kv1(x_1).reshape(B_//self.sr_ratio, -1, 2, self.num_heads//2, C // self.num_heads).permute(2, 0, 3, 1, 4)
                 k1, v1 = kv1[0].repeat(self.sr_ratio,1,self.sr_ratio,1), kv1[1].repeat(self.sr_ratio,1,self.sr_ratio,1) #B_ head N C
 
@@ -312,16 +312,16 @@ class Block(nn.Module):
             if m.bias is not None:
                 m.bias.data.zero_()
 
-    def forward(self, x, H, W, mask):
+    def forward(self, x, H, W, mask, gamma, beta):
         #x = torch.randn( 1,256,64,64)
         #B, C, H, W = x.shape
         #mask= None
         #outx, mask = attn(x, H, W, mask)
         #print(outx.shape) #[64, 64, 256]
-        x_ = self.norm1(x)
-        x_, mask = self.attn(x_, H, W, mask)
+        x_ = self.norm1(x, gamma, beta)
+        x_, mask = self.attn(x_, H, W, mask, gamma, beta)
         x = x + self.drop_path(x_)
-        x = self.norm2(x)
+        x = self.norm2(x, gamma, beta)
         x = self.mlp(x, H, W)
         x = x + self.drop_path(x)
 
