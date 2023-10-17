@@ -183,6 +183,5 @@ class FFC(nn.Module):
             xs = 0
 
         output = self.conv2(x + output + xs)
-        print(output.shape)
 
         return output
