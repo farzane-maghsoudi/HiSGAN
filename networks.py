@@ -6,6 +6,7 @@ from utils import resize2d
 from sgformer import *
 from involution_pytorch import Inv2d
 from adaILN import *
+from FFCBlock import *
 
 class ResnetGenerator(nn.Module):
     def __init__(self, input_nc, output_nc, ngf=64, n_blocks=100, img_size=256, light=False):
@@ -29,19 +30,19 @@ class ResnetGenerator(nn.Module):
 
         C = 256
         self.SGfomer1 = Block(C, mask= False, num_heads=8, mlp_ratio=4., qkv_bias=True, qk_scale=False, drop=0., attn_drop=0.,
-                 drop_path=0., act_layer=nn.GELU, sr_ratio=8, linear=False)
+                 drop_path=0., act_layer=nn.GELU,sr_ratio=8, linear=False)
         self.SGfomer2 = Block(C, mask= True, num_heads=8, mlp_ratio=4., qkv_bias=True, qk_scale=False, drop=0., attn_drop=0.,
                  drop_path=0., act_layer=nn.GELU, sr_ratio=8, linear=False)
         self.SGfomer3 = Block(C, mask= False, num_heads=8, mlp_ratio=4., qkv_bias=True, qk_scale=False, drop=0., attn_drop=0.,
                  drop_path=0., act_layer=nn.GELU, sr_ratio=2, linear=False)
         self.SGfomer4 = Block(C, mask= True, num_heads=8, mlp_ratio=4., qkv_bias=True, qk_scale=False, drop=0., attn_drop=0.,
-                 drop_path=0., act_layer=nn.GELU, sr_ratio=2, linear=False)
+                 drop_path=0., act_layer=nn.GELU,  sr_ratio=2, linear=False)
         self.SGfomer5 = Block(C, mask= False, num_heads=8, mlp_ratio=4., qkv_bias=True, qk_scale=False, drop=0., attn_drop=0.,
                  drop_path=0., act_layer=nn.GELU, sr_ratio=1, linear=False)
         self.SGfomer6 = Block(C, mask= True, num_heads=8, mlp_ratio=4., qkv_bias=True, qk_scale=False, drop=0., attn_drop=0.,
                  drop_path=0., act_layer=nn.GELU, sr_ratio=1, linear=False)
         #self.SGfomer7 = Block(C, mask= False, num_heads=8, mlp_ratio=4., qkv_bias=True, qk_scale=False, drop=0., attn_drop=0.,
-        #         drop_path=0., act_layer=nn.GELU, sr_ratio=1, linear=False)
+        #         drop_path=0., act_layer=nn.GELU, nsr_ratio=1, linear=False)
         #self.SGfomer8 = Block(C, mask= True, num_heads=8, mlp_ratio=4., qkv_bias=True, qk_scale=False, drop=0., attn_drop=0.,
         #         drop_path=0., act_layer=nn.GELU, sr_ratio=1, linear=False)  # sr_ratio=4 deleted
  
@@ -124,26 +125,20 @@ class Discriminator(nn.Module):
                  nn.utils.spectral_norm(
                  nn.Conv2d(input_nc, ndf, kernel_size=3, stride=1, padding=0, bias=True)),
                  nn.GELU()]
-        enc1 += [nn.utils.spectral_norm(nn.Conv2d(ndf, ndf, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU()]
-        enc11 = [nn.utils.spectral_norm(nn.Conv2d(ndf, ndf, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU()]
-        self.enc111 = nn.Conv2d(ndf, ndf, kernel_size=1, stride=1, bias=True)
-        
+        self.FFC1 = FFC(in_channels=ndf, out_channels=ndf)
+
         enc2 = [nn.ReflectionPad2d(1),
                  nn.utils.spectral_norm(
                  nn.Conv2d(ndf, ndf*2, kernel_size=3, stride=2, padding=0, bias=True)),
                  nn.GELU()]
-        enc2 += [nn.utils.spectral_norm(nn.Conv2d(ndf*2, ndf*2, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU()]
-        enc22 = [nn.utils.spectral_norm(nn.Conv2d(ndf*2, ndf*2, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU()]
-        self.enc222 = nn.Conv2d(ndf*2, ndf*2, kernel_size=1, stride=1, bias=True)
+        self.FFC2 = FFC(in_channels=ndf*2, out_channels=ndf*2)
 
         enc3 = [nn.ReflectionPad2d(1),
                  nn.utils.spectral_norm(
                  nn.Conv2d(ndf*2, ndf*4, kernel_size=3, stride=2, padding=0, bias=True)),
                  nn.GELU()]
-        enc3 += [nn.utils.spectral_norm(nn.Conv2d(ndf*4, ndf*4, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU()]
-        enc33 = [nn.utils.spectral_norm(nn.Conv2d(ndf*4, ndf*4, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU()]
-        self.enc333 = nn.Conv2d(ndf*4, ndf*4, kernel_size=1, stride=1, bias=True)
-        
+        self.FFC3 = FFC(in_channels=ndf*4, out_channels=ndf*4)
+
         #enc4 = [nn.ReflectionPad2d(1),
         #         nn.utils.spectral_norm(
         #         nn.Conv2d(ndf*2, ndf*4, kernel_size=3, stride=2, padding=0, bias=True)),
@@ -173,20 +168,20 @@ class Discriminator(nn.Module):
                       nn.GELU(),
                       nn.ReflectionPad2d(1),
                       nn.utils.spectral_norm(
-                      nn.Conv2d(ndf*8, ndf*8, kernel_size=4, stride=2, padding=0, bias=True)),
+                      nn.Conv2d(ndf*4, ndf*8, kernel_size=4, stride=2, padding=0, bias=True)),
                       nn.GELU(),
                       nn.ReflectionPad2d(1),
                       nn.utils.spectral_norm(
-                      nn.Conv2d(ndf*16, ndf*16, kernel_size=4, stride=2, padding=0, bias=True)),
+                      nn.Conv2d(ndf*8, ndf*16, kernel_size=4, stride=2, padding=0, bias=True)),
                       nn.GELU()]
         
         self.conv1 = nn.utils.spectral_norm(   #1+3*2^0 + 3*2^1 + 3*2^2 +3*2^3 + 3*2^3= 70
-            nn.Conv2d(ndf*4, 1, kernel_size=4, stride=1, padding=0, bias=False))
+            nn.Conv2d(ndf*4, 1, kernel_size=3, stride=1, padding=0, bias=False))
         self.conv2 = nn.utils.spectral_norm(
-            nn.Conv2d(ndf*16, 1, kernel_size=4, stride=1, padding=0, bias=False))
+            nn.Conv2d(ndf*16, 1, kernel_size=3, stride=1, padding=0, bias=False))
 
         self.convz = nn.utils.spectral_norm(
-            nn.Conv2d(ndf*4, (ndf*4-(ndf+3)), kernel_size=4, stride=1, padding=0, bias=False))
+            nn.Conv2d(ndf*4, (ndf*4-(ndf+3)), kernel_size=3, stride=1, padding=1, bias=False))
         
 
         self.pad = nn.ReflectionPad2d(1)
@@ -195,40 +190,29 @@ class Discriminator(nn.Module):
         self.Dis2 = nn.Sequential(*Dis2)
         
         self.enc1 = nn.Sequential(*enc1)
-        self.enc11 = nn.Sequential(*enc11)
         self.enc2 = nn.Sequential(*enc2)
-        self.enc22 = nn.Sequential(*enc22)
         self.enc3 = nn.Sequential(*enc3)
-        self.enc33 = nn.Sequential(*enc33)
-        
-        #self.enc4 = nn.Sequential(*enc4)
         
     def forward(self, input):
       
         x1 = self.enc1(input)
-        x1 = self.enc11(torch.fft.fft2(x1))
-        x1 = self.enc111(torch.fft.ifft2(x1))
+        x1 = self.FFC1(x1)
         
         x2 = self.enc2(x1)
-        x2 = self.enc22(torch.fft.fft2(x2))
-        x2 = self.enc222(torch.fft.ifft2(x2))
+        x2 = self.FFC2(x2)
 
         x3 = self.enc3(x2)
-        x3 = self.enc33(torch.fft.fft2(x3))
-        x3 = self.enc333(torch.fft.ifft2(x3))
-        
-        #x4 = self.enc4(x3)
+        x3 = self.FFC3(x3)
 
         z = self.convz(x3)
-        z = x =  self.GELU(z)    # dimention 256-(k+3)
+        z = x =  self.GELU(z)    # dimention 256-(k+3): 189, 64, 64
 
-        x1 = self.Dis1(x1)
-        x3 = self.Dis2(x3)
-        x1 = self.pad(x1)
-        x3 = self.pad(x3)
-        out1 = self.conv1(x1)
-        out2 = self.conv2(x3)
-
+        x11 = self.Dis1(x1)
+        x33 = self.Dis2(x3)
+        x11 = self.pad(x11)
+        x33 = self.pad(x33)
+        out1 = self.conv1(x11)
+        out2 = self.conv2(x33)
         
         # number ibput and output cheked.
         #x1, x2, x3 for loss CT.
