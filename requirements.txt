@@ -4,5 +4,3 @@ Pytorch
 torchvision
 TensorboardX
 tensorflow
-thop
-involution_pytorch
