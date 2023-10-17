@@ -74,10 +74,10 @@ class ResnetGenerator(nn.Module):
         _, _, H, W= z.shape
         # calcuator SVD in input
         S = torch.linalg.svdvals(input)
-        c1 = torch.matmul(torch.reshape(S[0,0:H,0], (H,1)), torch.reshape(S[0,0:H,1], (1,H)))
-        c2 = torch.matmul(torch.reshape(S[0,0:H,1], (H,1)), torch.reshape(S[0,0:H,2], (1,H)))
-        c3 = torch.matmul(torch.reshape(S[0,0:H,0], (H,1)), torch.reshape(S[0,0:H,2], (1,H)))
-        c4 = torch.matmul(torch.reshape(c1, (H, H, 1)), torch.reshape(S[0,0:H,2], (1, 1, H)))
+        c1 = torch.matmul(torch.reshape(S[0,0,0:H], (H,1)), torch.reshape(S[0,1,0:H], (1,H)))
+        c2 = torch.matmul(torch.reshape(S[0,1,0:H], (H,1)), torch.reshape(S[0,2,0:H], (1,H)))
+        c3 = torch.matmul(torch.reshape(S[0,0,0:H], (H,1)), torch.reshape(S[0,2,0:H], (1,H)))
+        c4 = torch.matmul(torch.reshape(c1, (H, H, 1)), torch.reshape(S[0,2,0:H], (1, 1, H)))
         
         svd = torch.cat((torch.reshape(c1, (1,1,H,H)),torch.reshape(c2, (1,1,H,H)),torch.reshape(c3, (1,1,H,H))), dim=1)
         svd = torch.cat((svd,torch.reshape(c4, (1,H,H,H))), dim=1)
