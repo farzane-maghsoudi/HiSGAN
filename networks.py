@@ -48,21 +48,21 @@ class ResnetGenerator(nn.Module):
         # Up-Sampling
         self.dec0 = [nn.ReflectionPad2d(1),   
                          nn.Conv2d(ngf*4, ngf*4, kernel_size=3, stride=1, padding=0, bias=False),
-                         adaILN(ndf*2),
+                         adaILN(ngf*4),
                          nn.GELU]
         self.dec3 = [nn.ReflectionPad2d(1),   
                          nn.Conv2d(ngf*8, ngf*8, kernel_size=3, stride=1, padding=0, bias=False),
                          nn.PixelShuffle(2),
-                         adaILN(ndf*2),
+                         adaILN(ngf*2),
                          nn.GELU]
         self.dec2 = [nn.ReflectionPad2d(1),   
                          nn.Conv2d(ngf*4, ngf*4, kernel_size=3, stride=1, padding=0, bias=False),
                          nn.PixelShuffle(2),
-                         adaILN(ndf),
+                         adaILN(ngf),
                          nn.GELU]
         self.dec1 = [nn.ReflectionPad2d(1),   
                          nn.Conv2d(ngf, ngf, kernel_size=3, stride=1, padding=0, bias=False),
-                         adaILN(ndf),
+                         adaILN(ngf),
                          nn.GELU,
                          nn.ReflectionPad2d(3),
                          nn.Conv2d(ngf, output_nc, kernel_size=7, stride=1, padding=0, bias=False),
