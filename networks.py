@@ -96,6 +96,7 @@ class ResnetGenerator(nn.Module):
         #self.inv6 = Inv2d(channels=256, kernel_size=3, stride=1) 
         #self.inv7 = Inv2d(channels=256, kernel_size=3, stride=1) 
 
+        C = 256
         self.SGfomer1 = Block(C, mask= False, num_heads=8, mlp_ratio=4., qkv_bias=True, qk_scale=False, drop=0., attn_drop=0.,
                  drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, sr_ratio=8, linear=False)
         self.SGfomer2 = Block(C, mask= True, num_heads=8, mlp_ratio=4., qkv_bias=True, qk_scale=False, drop=0., attn_drop=0.,
