@@ -18,17 +18,31 @@ class ResnetGenerator(nn.Module):
         self.n_blocks = n_blocks
         self.img_size = img_size
         self.light = light
+        C = ngf * 4 #256
+
+        # Gamma, Beta block
+        if self.light:
+            FC = [nn.Linear(C, C, bias=False),
+                  nn.ReLU(True),
+                  nn.Linear(C, C, bias=False),
+                  nn.ReLU(True)]
+        else:
+            FC = [nn.Linear(img_size // 4 * img_size // C * 4, C, bias=False),
+                  nn.ReLU(True),
+                  nn.Linear(C, C, bias=False),
+                  nn.ReLU(True)]
+        self.gamma = nn.Linear(C, C, bias=False)
+        self.beta = nn.Linear(C, C, bias=False)
 
         # Bottleneck
-        self.inv1 = Inv2d(channels=256, kernel_size=3, stride=1) # channel+k+3 => channel=256, k=32, 291 => channel=128, k=64, 195
-        self.inv2 = Inv2d(channels=256, kernel_size=3, stride=1) 
-        self.inv3 = Inv2d(channels=256, kernel_size=3, stride=1) 
-        self.inv4 = Inv2d(channels=256, kernel_size=3, stride=1) 
-        self.inv5 = Inv2d(channels=256, kernel_size=3, stride=1) 
-        #self.inv6 = Inv2d(channels=256, kernel_size=3, stride=1) 
-        #self.inv7 = Inv2d(channels=256, kernel_size=3, stride=1) 
+        self.inv1 = Inv2d(channels=C, kernel_size=3, stride=1) # channel+k+3 => channel=256, k=32, 291 => channel=128, k=64, 195
+        self.inv2 = Inv2d(channels=C, kernel_size=3, stride=1) 
+        self.inv3 = Inv2d(channels=C, kernel_size=3, stride=1) 
+        self.inv4 = Inv2d(channels=C, kernel_size=3, stride=1) 
+        self.inv5 = Inv2d(channels=C, kernel_size=3, stride=1) 
+        #self.inv6 = Inv2d(channels=C, kernel_size=3, stride=1) 
+        #self.inv7 = Inv2d(channels=C, kernel_size=3, stride=1) 
 
-        C = 256
         self.SGfomer1 = Block(C, mask= False, num_heads=8, mlp_ratio=4., qkv_bias=True, qk_scale=False, drop=0., attn_drop=0.,
                  drop_path=0., act_layer=nn.GELU,sr_ratio=8, linear=False)
         self.SGfomer2 = Block(C, mask= True, num_heads=8, mlp_ratio=4., qkv_bias=True, qk_scale=False, drop=0., attn_drop=0.,
@@ -88,22 +102,28 @@ class ResnetGenerator(nn.Module):
 
 
         # Bottleneck
+        if self.light:
+            xx_ = torch.nn.functional.adaptive_avg_pool2d(x, 1)
+            xx_ = self.FC(xx_.view(xx_.shape[0], -1))
+        else:
+            xx_ = self.FC(x.view(x.shape[0], -1))
+        gamma, beta = self.gamma(xx_), self.beta(xx_)
         mask = None
-        x, mask = self.SGfomer1(x, H, W, mask)
+        x, mask = self.SGfomer1(x, H, W, mask, gamma, beta)
         x = self.inv1(x)
-        x, mask = self.SGfomer2(x, H, W, mask)
+        x, mask = self.SGfomer2(x, H, W, mask, gamma, beta)
         x = self.inv2(x)
-        x, mask = self.SGfomer3(x, H, W, mask)
+        x, mask = self.SGfomer3(x, H, W, mask, gamma, beta)
         x = self.inv3(x)
-        x, mask = self.SGfomer4(x, H, W, mask)
+        x, mask = self.SGfomer4(x, H, W, mask, gamma, beta)
         x = self.inv4(x)
-        x, mask = self.SGfomer5(x, H, W, mask)
+        x, mask = self.SGfomer5(x, H, W, mask, gamma, beta)
         x = self.inv5(x)
-        x, mask = self.SGfomer6(x, H, W, mask)
+        x, mask = self.SGfomer6(x, H, W, mask, gamma, beta)
         #x = self.inv6(x)
-        #x, mask = self.SGfomer7(x, H, W, mask)
+        #x, mask = self.SGfomer7(x, H, W, mask, gamma, beta)
         #x = self.inv7(x)
-        #x, mask = self.SGfomer8(x, H, W, mask)
+        #x, mask = self.SGfomer8(x, H, W, mask, gamma, beta)
 
         # Up-Sampling
         x = self.dec0(x)
