@@ -124,27 +124,26 @@ class Discriminator(nn.Module):
                  nn.utils.spectral_norm(
                  nn.Conv2d(input_nc, ndf, kernel_size=3, stride=1, padding=0, bias=True)),
                  nn.GELU()]
-        enc1 += [nn.utils.spectral_norm(nn.Conv2d(ndf, ndf, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU(),
-                 torch.fft.fft2(),
-                 nn.utils.spectral_norm(nn.Conv2d(ndf, ndf, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU(),
-                 torch.fft.ifft2(),  nn.Conv2d(ndf, ndf, kernel_size=1, stride=1, bias=True)]
+        enc1 += [nn.utils.spectral_norm(nn.Conv2d(ndf, ndf, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU()]
+        enc11 = [nn.utils.spectral_norm(nn.Conv2d(ndf, ndf, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU()]
+        self.enc111 = nn.Conv2d(ndf, ndf, kernel_size=1, stride=1, bias=True)
         
         enc2 = [nn.ReflectionPad2d(1),
                  nn.utils.spectral_norm(
                  nn.Conv2d(ndf, ndf*2, kernel_size=3, stride=2, padding=0, bias=True)),
                  nn.GELU()]
-        enc2 += [nn.utils.spectral_norm(nn.Conv2d(ndf*2, ndf*2, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU(),
-                 torch.fft.fft2(),
-                 nn.utils.spectral_norm(nn.Conv2d(ndf*2, ndf*2, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU(),
-                 torch.fft.ifft2(),  nn.Conv2d(ndf*2, ndf*2, kernel_size=1, stride=1, bias=True)]
+        enc2 += [nn.utils.spectral_norm(nn.Conv2d(ndf*2, ndf*2, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU()]
+        enc22 = [nn.utils.spectral_norm(nn.Conv2d(ndf*2, ndf*2, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU()]
+        self.enc222 = nn.Conv2d(ndf*2, ndf*2, kernel_size=1, stride=1, bias=True)
+
         enc3 = [nn.ReflectionPad2d(1),
                  nn.utils.spectral_norm(
                  nn.Conv2d(ndf*2, ndf*4, kernel_size=3, stride=2, padding=0, bias=True)),
                  nn.GELU()]
-        enc3 += [nn.utils.spectral_norm(nn.Conv2d(ndf*4, ndf*4, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU(),
-                 torch.fft.fft2(),
-                 nn.utils.spectral_norm(nn.Conv2d(ndf*4, ndf*4, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU(),
-                 torch.fft.ifft2(),  nn.Conv2d(ndf*4, ndf*4, kernel_size=1, stride=1, bias=True)]
+        enc3 += [nn.utils.spectral_norm(nn.Conv2d(ndf*4, ndf*4, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU()]
+        enc33 = [nn.utils.spectral_norm(nn.Conv2d(ndf*4, ndf*4, kernel_size=3, stride=1, padding=0, bias=True)),nn.GELU()]
+        self.enc333 = nn.Conv2d(ndf*4, ndf*4, kernel_size=1, stride=1, bias=True)
+        
         #enc4 = [nn.ReflectionPad2d(1),
         #         nn.utils.spectral_norm(
         #         nn.Conv2d(ndf*2, ndf*4, kernel_size=3, stride=2, padding=0, bias=True)),
@@ -196,15 +195,28 @@ class Discriminator(nn.Module):
         self.Dis2 = nn.Sequential(*Dis2)
         
         self.enc1 = nn.Sequential(*enc1)
+        self.enc11 = nn.Sequential(*enc11)
         self.enc2 = nn.Sequential(*enc2)
+        self.enc22 = nn.Sequential(*enc22)
         self.enc3 = nn.Sequential(*enc3)
+        self.enc33 = nn.Sequential(*enc33)
+        
         #self.enc4 = nn.Sequential(*enc4)
         
     def forward(self, input):
       
         x1 = self.enc1(input)
+        x1 = self.enc11(torch.fft.fft2(x1))
+        x1 = self.enc111(torch.fft.ifft2(x1))
+        
         x2 = self.enc2(x1)
+        x2 = self.enc22(torch.fft.fft2(x2))
+        x2 = self.enc222(torch.fft.ifft2(x2))
+
         x3 = self.enc3(x2)
+        x3 = self.enc33(torch.fft.fft2(x3))
+        x3 = self.enc333(torch.fft.ifft2(x3))
+        
         #x4 = self.enc4(x3)
 
         z = self.convz(x3)
