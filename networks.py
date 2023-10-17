@@ -98,21 +98,21 @@ class ResnetGenerator(nn.Module):
 
         C = 256
         self.SGfomer1 = Block(C, mask= False, num_heads=8, mlp_ratio=4., qkv_bias=True, qk_scale=False, drop=0., attn_drop=0.,
-                 drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, sr_ratio=8, linear=False)
+                 drop_path=0., act_layer=nn.GELU, sr_ratio=8, linear=False)
         self.SGfomer2 = Block(C, mask= True, num_heads=8, mlp_ratio=4., qkv_bias=True, qk_scale=False, drop=0., attn_drop=0.,
-                 drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, sr_ratio=8, linear=False)
+                 drop_path=0., act_layer=nn.GELU, sr_ratio=8, linear=False)
         self.SGfomer3 = Block(C, mask= False, num_heads=8, mlp_ratio=4., qkv_bias=True, qk_scale=False, drop=0., attn_drop=0.,
-                 drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, sr_ratio=2, linear=False)
+                 drop_path=0., act_layer=nn.GELU, sr_ratio=2, linear=False)
         self.SGfomer4 = Block(C, mask= True, num_heads=8, mlp_ratio=4., qkv_bias=True, qk_scale=False, drop=0., attn_drop=0.,
-                 drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, sr_ratio=2, linear=False)
+                 drop_path=0., act_layer=nn.GELU, sr_ratio=2, linear=False)
         self.SGfomer5 = Block(C, mask= False, num_heads=8, mlp_ratio=4., qkv_bias=True, qk_scale=False, drop=0., attn_drop=0.,
-                 drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, sr_ratio=1, linear=False)
+                 drop_path=0., act_layer=nn.GELU, sr_ratio=1, linear=False)
         self.SGfomer6 = Block(C, mask= True, num_heads=8, mlp_ratio=4., qkv_bias=True, qk_scale=False, drop=0., attn_drop=0.,
-                 drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, sr_ratio=1, linear=False)
+                 drop_path=0., act_layer=nn.GELU, sr_ratio=1, linear=False)
         #self.SGfomer7 = Block(C, mask= False, num_heads=8, mlp_ratio=4., qkv_bias=True, qk_scale=False, drop=0., attn_drop=0.,
-        #         drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, sr_ratio=1, linear=False)
+        #         drop_path=0., act_layer=nn.GELU, sr_ratio=1, linear=False)
         #self.SGfomer8 = Block(C, mask= True, num_heads=8, mlp_ratio=4., qkv_bias=True, qk_scale=False, drop=0., attn_drop=0.,
-        #         drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, sr_ratio=1, linear=False)  # sr_ratio=4 deleted
+        #         drop_path=0., act_layer=nn.GELU, sr_ratio=1, linear=False)  # sr_ratio=4 deleted
  
         # Up-Sampling
         self.dec0 = [nn.ReflectionPad2d(1),   
