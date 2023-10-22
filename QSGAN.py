@@ -229,11 +229,11 @@ class QSGAN(object) :
             D_ad_loss_LA = self.MSE_loss(real_LA_logit, torch.ones_like(real_LA_logit).to(self.device)) + self.MSE_loss(fake_LA_logit, torch.zeros_like(fake_LA_logit).to(self.device))
             D_ad_loss_GB = self.MSE_loss(real_GB_logit, torch.ones_like(real_GB_logit).to(self.device)) + self.MSE_loss(fake_GB_logit, torch.zeros_like(fake_GB_logit).to(self.device))
             D_ad_loss_LB = self.MSE_loss(real_LB_logit, torch.ones_like(real_LB_logit).to(self.device)) + self.MSE_loss(fake_LB_logit, torch.zeros_like(fake_LB_logit).to(self.device))
-            D_loss_pnalty_A = cal_gradient_penalty(real_A, A=True) + cal_gradient_penalty(fake_B2A, A=True)
-            D_loss_pnalty_B = cal_gradient_penalty(real_B, A=False) + cal_gradient_penalty(fake_A2B, A=True)
+            D_loss_penalty_A = self.cal_gradient_penalty(real_A, w=True) + self.cal_gradient_penalty(fake_A2B, w=True)
+            D_loss_penalty_B = self.cal_gradient_penalty(real_B, w=False) + self.cal_gradient_penalty(fake_B2A, w=False)
             
-            D_loss_A = self.adv_weight * (D_ad_loss_GA + D_ad_loss_LA) + self.pnalty_weight * D_loss_pnalty_A
-            D_loss_B = self.adv_weight * (D_ad_loss_GB + D_ad_loss_LB) + self.pnalty_weight * D_loss_pnalty_B
+            D_loss_A = self.adv_weight * (D_ad_loss_GA + D_ad_loss_LA) + self.penalty_weight * D_loss_penalty_A
+            D_loss_B = self.adv_weight * (D_ad_loss_GB + D_ad_loss_LB) + self.penalty_weight * D_loss_penalty_B
 
             Discriminator_loss = D_loss_A + D_loss_B
             Discriminator_loss.backward()
@@ -268,8 +268,8 @@ class QSGAN(object) :
             G_ad_loss_GB = self.MSE_loss(fake_GB_logit, torch.ones_like(fake_GB_logit).to(self.device))
             G_ad_loss_LB = self.MSE_loss(fake_LB_logit, torch.ones_like(fake_LB_logit).to(self.device))
 
-            G_Contrast_Loss_A = ContrastLoss([fake_A2B2A_x1, fake_A2B2A_x2, fake_A2B2A_x3], [real_A_x1, real_A_x2, real_A_x3], [fake_A2B_x1, fake_A2B_x2, fake_A2B_x3])
-            G_Contrast_Loss_B = ContrastLoss([fake_B2A2B_x1, fake_B2A2B_x2, fake_B2A2B_x3], [real_B_x1, real_B_x2, real_B_x3], [fake_B2A_x1, fake_B2A_x2, fake_B2A_x3])
+            G_Contrast_Loss_A = self.ContrastLoss([fake_A2B2A_x1, fake_A2B2A_x2, fake_A2B2A_x3], [real_A_x1, real_A_x2, real_A_x3], [fake_A2B_x1, fake_A2B_x2, fake_A2B_x3])
+            G_Contrast_Loss_B = self.ContrastLoss([fake_B2A2B_x1, fake_B2A2B_x2, fake_B2A2B_x3], [real_B_x1, real_B_x2, real_B_x3], [fake_B2A_x1, fake_B2A_x2, fake_B2A_x3])
 
             #G_cycle_loss_A = self.L1_loss(fake_A2B2A, real_A)
             #G_cycle_loss_B = self.L1_loss(fake_B2A2B, real_B)
@@ -277,8 +277,8 @@ class QSGAN(object) :
             G_identity_loss_A = self.L1_loss(fake_A2A, real_A)
             G_identity_loss_B = self.L1_loss(fake_B2B, real_B)
 
-            G_loss_A = self.adv_weight * (G_ad_loss_GA + G_ad_loss_LA ) + self.Contrast_weight * G_Contrast_Loss_A + self.identity_weight * G_identity_loss_A
-            G_loss_B = self.adv_weight * (G_ad_loss_GB + G_ad_loss_LB ) + self.Contrast_weight * G_Contrast_Loss_B + self.identity_weight * G_identity_loss_B
+            G_loss_A = self.adv_weight * (G_ad_loss_GA + G_ad_loss_LA ) + self.contrast_weight * G_Contrast_Loss_A + self.identity_weight * G_identity_loss_A
+            G_loss_B = self.adv_weight * (G_ad_loss_GB + G_ad_loss_LB ) + self.contrast_weight * G_Contrast_Loss_B + self.identity_weight * G_identity_loss_B
 
             Generator_loss = G_loss_A + G_loss_B
             Generator_loss.backward()
@@ -426,24 +426,24 @@ class QSGAN(object) :
                 
                 self.gen2B.train(), self.gen2A.train(), self.disA.train(), self.disB.train()
 
-    def cal_gradient_penalty(x, A=True):
+    def cal_gradient_penalty(self, x, w=True):
         constant = 1.0
         x.requires_grad_(True)
-        if A:
+        if w:
             _, _, _, out1, out2, _ = self.disA(x)
         else:
             _, _, _, out1, out2, _ = self.disB(x)
         #y = model(x)
         #using torch.autograd.grad
         gradients1 = torch.autograd.grad(out1, x, retain_graph=True, grad_outputs=torch.ones_like(out1))[0] 
-        gradients1 = gradients[0].view(x.size(0), -1)
+        gradients1 = gradients1[0].view(x.size(0), -1)
         gradients2 = torch.autograd.grad(out2, x, retain_graph=True, grad_outputs=torch.ones_like(out2))[0] 
-        gradients2 = gradients[0].view(x.size(0), -1)
+        gradients2 = gradients2[0].view(x.size(0), -1)
         gradient_penalty1 = (((gradients1 + 1e-16).norm(2, dim=1) - constant) ** 2).mean()
         gradient_penalty2 = (((gradients2 + 1e-16).norm(2, dim=1) - constant) ** 2).mean()
         return gradient_penalty1+gradient_penalty2
 
-    def ContrastLoss(a, p, n):
+    def ContrastLoss(self, a, p, n):
       loss = 0
       tau = 0.07
 
