@@ -23,14 +23,14 @@ class ResnetGenerator(nn.Module):
         # Gamma, Beta block
         if self.light:
             FC = [nn.Linear(C, C, bias=False),
-                  nn.ReLU(True),
+                  nn.GELU(),
                   nn.Linear(C, C, bias=False),
-                  nn.ReLU(True)]
+                  nn.GELU()]
         else:
             FC = [nn.Linear(img_size // 4 * img_size // C * 4, C, bias=False),
-                  nn.ReLU(True),
+                  nn.GELU(),
                   nn.Linear(C, C, bias=False),
-                  nn.ReLU(True)]
+                  nn.GELU()]  #nn.ReLU(True)
         self.gamma = nn.Linear(C, C, bias=False)
         self.beta = nn.Linear(C, C, bias=False)
 
@@ -64,24 +64,26 @@ class ResnetGenerator(nn.Module):
         dec0 = [nn.ReflectionPad2d(1),   
                          nn.Conv2d(ngf*4, ngf*4, kernel_size=3, stride=1, padding=0, bias=False),
                          ILN(ngf*4),
-                         nn.GELU]
+                         nn.GELU()]
         dec3 = [nn.ReflectionPad2d(1),   
                          nn.Conv2d(ngf*8, ngf*8, kernel_size=3, stride=1, padding=0, bias=False),
                          nn.PixelShuffle(2),
                          ILN(ngf*2),
-                         nn.GELU]
+                         nn.GELU()]
         dec2 = [nn.ReflectionPad2d(1),   
                          nn.Conv2d(ngf*4, ngf*4, kernel_size=3, stride=1, padding=0, bias=False),
                          nn.PixelShuffle(2),
                          ILN(ngf),
-                         nn.GELU]
+                         nn.GELU()]
         dec1 = [nn.ReflectionPad2d(1),   
                          nn.Conv2d(ngf, ngf, kernel_size=3, stride=1, padding=0, bias=False),
                          ILN(ngf),
-                         nn.GELU,
+                         nn.GELU(),
                          nn.ReflectionPad2d(3),
                          nn.Conv2d(ngf, output_nc, kernel_size=7, stride=1, padding=0, bias=False),
                          nn.Tanh()]
+
+
         self.FC = nn.Sequential(*FC)
         self.dec0 = nn.Sequential(*dec0)
         self.dec1 = nn.Sequential(*dec1)
@@ -246,4 +248,3 @@ class Discriminator(nn.Module):
         #x1, x2, x3 for loss CT.
         
         return x1, x2, x3, out1, out2, z
-
