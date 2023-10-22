@@ -86,7 +86,7 @@ class Attention(nn.Module):
                     
             else:
                 self.sr = nn.Conv2d(dim, dim, kernel_size=sr_ratio, stride=sr_ratio)
-                self.norm = adaILN(dim)
+                self.norm = nn.LayerNorm(dim)
                 self.act = nn.GELU()
 
                 self.q1 = nn.Linear(dim, dim//2, bias=qkv_bias)
@@ -119,7 +119,7 @@ class Attention(nn.Module):
             if m.bias is not None:
                 m.bias.data.zero_()
 
-    def forward(self, x, H, W, mask, gamma, beta):
+    def forward(self, x, H, W, mask):
         x = x.flatten(2).transpose(1, 2)
         B, L, C = x.shape
         B_, N= H, W
@@ -132,7 +132,8 @@ class Attention(nn.Module):
                 q1 = self.q1(x).reshape(B_, N, self.num_heads//2, C // self.num_heads).permute(0, 2, 1, 3)
                 x_ = x.permute(2, 0, 1).reshape(B, C, H, W)
                 x_1 = self.sr(x_).reshape(C, B_//self.sr_ratio,N//self.sr_ratio).permute(1,2,0)
-                x_1 = self.act(self.norm(x_1, gamma, beta))
+                x_1 = self.norm(x_1)
+                x_1 = self.act(x_1)
                 kv1 = self.kv1(x_1).reshape(B_//self.sr_ratio, -1, 2, self.num_heads//2, C // self.num_heads).permute(2, 0, 3, 1, 4)
                 k1, v1 = kv1[0].repeat(self.sr_ratio,1,self.sr_ratio,1), kv1[1].repeat(self.sr_ratio,1,self.sr_ratio,1) #B_ head N C
 
@@ -188,7 +189,8 @@ class Attention(nn.Module):
                     r1, r2, r3 = 8, 4, 2
                     token1, token2, token3 = H * W // (r1*4), H * W // (r2*2), H * W //(r3*4)
                 elif self.sr_ratio == 2:
-                    token1, token2 = H * W // (r1*2), H * W // (r2*1)
+                    r1, r2, r3 = 2, 1, None
+                    token1, token2 = H * W // (r1*2), H * W // (r2*2)
 
                 if self.sr_ratio==4 or self.sr_ratio==8:
                     x_ = x.permute( 1, 0, 2).reshape(1, H * W, C)
@@ -211,14 +213,12 @@ class Attention(nn.Module):
 
                     p1 = torch.gather(x, 1, mask_sort_index1[:, :H * W // 2].unsqueeze(-1).repeat(1, 1, C))  # B, N//2, C
                     p2 = torch.gather(x, 1, mask_sort_index1[:, H * W // 2:].unsqueeze(-1).repeat(1, 1, C))
-                    
+
                     seq1 = torch.cat([self.f1(p1.permute(0, 2, 1).reshape(B, C, token1, -1)).squeeze(-1),
                                       self.f2(p2.permute(0, 2, 1).reshape(B, C, token2, -1)).squeeze(-1)], dim=-1).permute(0, 2, 1)  # B N C
 
                     p1_ = torch.gather(x_, 1, mask_sort_index2[:, :H * W // 2].unsqueeze(-1).repeat(1, 1, C))  # B, N//4, C
                     p2_ = torch.gather(x_, 1, mask_sort_index2[:, H * W // 2:].unsqueeze(-1).repeat(1, 1, C))
-                    print("p1_",p1_.shape)
-                    print("p2_",p2_.shape)
 
                     seq2 = torch.cat([self.f1(p1_.permute(0, 2, 1).reshape(B, C, token1, -1)).squeeze(-1),
                                       self.f2(p2_.permute(0, 2, 1).reshape(B, C, token2, -1)).squeeze(-1)], dim=-1).permute(0, 2, 1)  # B N C
@@ -283,7 +283,7 @@ class Block(nn.Module):
     def __init__(self, dim, mask, num_heads, mlp_ratio=4., qkv_bias=False, qk_scale=None, drop=0., attn_drop=0.,
                  drop_path=0., act_layer=nn.GELU, sr_ratio=1, linear=False):
         super().__init__()
-        self.norm1 = adaILN(dim)
+        self.norm1 = ILN(dim) #nn.LayerNorm(dim) #adaILN(dim)
         #self.attn = Attention(
         #        dim=C, mask,
          #       num_heads=8, qkv_bias=True, qk_scale=False,
@@ -294,7 +294,7 @@ class Block(nn.Module):
             attn_drop=attn_drop, proj_drop=drop, sr_ratio=sr_ratio, linear=linear)
         # NOTE: drop path for stochastic depth, we shall see if this is better than dropout here
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
-        self.norm2 = adaILN(dim)
+        self.norm2 = ILN(dim) #nn.LayerNorm(dim) #adaILN(dim)
         mlp_hidden_dim = int(dim * mlp_ratio)
         self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=act_layer, drop=drop)
 
@@ -312,17 +312,19 @@ class Block(nn.Module):
             if m.bias is not None:
                 m.bias.data.zero_()
 
-    def forward(self, x, H, W, mask, gamma, beta):
+    def forward(self, x, H, W, mask):
         #x = torch.randn( 1,256,64,64)
         #B, C, H, W = x.shape
         #mask= None
         #outx, mask = attn(x, H, W, mask)
         #print(outx.shape) #[64, 64, 256]
-        x_ = self.norm1(x, gamma, beta)
-        x_, mask = self.attn(x_, H, W, mask, gamma, beta)
-        x = x + self.drop_path(x_)
-        x = self.norm2(x, gamma, beta)
-        x = self.mlp(x, H, W)
+        B, C,_,_ = x.shape
+        x_ = self.norm1(x)
+        x_, mask = self.attn(x_, H, W, mask) #x=(1,256,64,64), x_=(1,64,64,256)
+        x = x + self.drop_path(x_.permute(0, 3, 1, 2))
+        x = self.norm2(x)
+        x = self.mlp(x.flatten(2).transpose(1, 2), H, W)
+        x = x.view(B, C, H, W)
         x = x + self.drop_path(x)
 
         return x, mask
