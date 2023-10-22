@@ -311,10 +311,10 @@ class QSGAN(object) :
                 self.save(os.path.join(self.result_dir, self.dataset, 'model'), step)
                 #save_dr_latest = "/content/gdrive/MyDrive/checkpointTTL-GAN/" + self.dataset + "_params_latest.pt"
                 #save_TTLGAN_latest = "/content/TTL-GAN/results/" + self.dataset + "_params_latest.pt"
-                save_dr_step = "/content/gdrive/MyDrive/checkpointTTL-GAN/" + self.dataset + '_params_%07d.pt' % step
-                save_TTLGAN_step = "/content/TTL-GAN/results/" + self.dataset + "/model/" + self.dataset + '_params_%07d.pt' % step
-                #shutil.copy( save_TTLGAN_latest , save_dr_latest )
-                shutil.copy( save_TTLGAN_step , save_dr_step )
+                save_dr_step = "/content/gdrive/MyDrive/checkpointQS-GAN/" + self.dataset + '_params_%07d.pt' % step
+                save_QSGAN_step = "/content/QS-GAN/results/" + self.dataset + "/model/" + self.dataset + '_params_%07d.pt' % step
+                #shutil.copy( save_QSGAN_latest , save_dr_latest )
+                shutil.copy( save_QSGAN_step , save_dr_step )
 
             if step % self.print_freq == 0:
                 print('current D_learning rate:{}'.format(self.D_optim.param_groups[0]['lr']))
