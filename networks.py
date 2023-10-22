@@ -61,27 +61,32 @@ class ResnetGenerator(nn.Module):
         #         drop_path=0., act_layer=nn.GELU, sr_ratio=1, linear=False)  # sr_ratio=4 deleted
  
         # Up-Sampling
-        self.dec0 = [nn.ReflectionPad2d(1),   
+        dec0 = [nn.ReflectionPad2d(1),   
                          nn.Conv2d(ngf*4, ngf*4, kernel_size=3, stride=1, padding=0, bias=False),
                          ILN(ngf*4),
                          nn.GELU]
-        self.dec3 = [nn.ReflectionPad2d(1),   
+        dec3 = [nn.ReflectionPad2d(1),   
                          nn.Conv2d(ngf*8, ngf*8, kernel_size=3, stride=1, padding=0, bias=False),
                          nn.PixelShuffle(2),
                          ILN(ngf*2),
                          nn.GELU]
-        self.dec2 = [nn.ReflectionPad2d(1),   
+        dec2 = [nn.ReflectionPad2d(1),   
                          nn.Conv2d(ngf*4, ngf*4, kernel_size=3, stride=1, padding=0, bias=False),
                          nn.PixelShuffle(2),
                          ILN(ngf),
                          nn.GELU]
-        self.dec1 = [nn.ReflectionPad2d(1),   
+        dec1 = [nn.ReflectionPad2d(1),   
                          nn.Conv2d(ngf, ngf, kernel_size=3, stride=1, padding=0, bias=False),
                          ILN(ngf),
                          nn.GELU,
                          nn.ReflectionPad2d(3),
                          nn.Conv2d(ngf, output_nc, kernel_size=7, stride=1, padding=0, bias=False),
                          nn.Tanh()]
+        self.FC = nn.Sequential(*FC)
+        self.dec0 = nn.Sequential(*dec0)
+        self.dec1 = nn.Sequential(*dec1)
+        self.dec2 = nn.Sequential(*dec2)
+        self.dec3 = nn.Sequential(*dec3)
 
     def forward(self, input, z, x1, x2, x3):
         #x = z
