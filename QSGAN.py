@@ -229,8 +229,8 @@ class QSGAN(object) :
             D_ad_loss_LA = self.MSE_loss(real_LA_logit, torch.ones_like(real_LA_logit).to(self.device)) + self.MSE_loss(fake_LA_logit, torch.zeros_like(fake_LA_logit).to(self.device))
             D_ad_loss_GB = self.MSE_loss(real_GB_logit, torch.ones_like(real_GB_logit).to(self.device)) + self.MSE_loss(fake_GB_logit, torch.zeros_like(fake_GB_logit).to(self.device))
             D_ad_loss_LB = self.MSE_loss(real_LB_logit, torch.ones_like(real_LB_logit).to(self.device)) + self.MSE_loss(fake_LB_logit, torch.zeros_like(fake_LB_logit).to(self.device))
-            D_loss_penalty_A = self.cal_gradient_penalty(real_A, w=True) + self.cal_gradient_penalty(fake_A2B, w=True)
-            D_loss_penalty_B = self.cal_gradient_penalty(real_B, w=False) + self.cal_gradient_penalty(fake_B2A, w=False)
+            D_loss_penalty_A = self.cal_gradient_penalty(real_A, w=True) + self.cal_gradient_penalty(fake_B2A, w=True)
+            D_loss_penalty_B = self.cal_gradient_penalty(real_B, w=False) + self.cal_gradient_penalty(fake_A2B, w=False)
             
             D_loss_A = self.adv_weight * (D_ad_loss_GA + D_ad_loss_LA) + self.penalty_weight * D_loss_penalty_A
             D_loss_B = self.adv_weight * (D_ad_loss_GB + D_ad_loss_LB) + self.penalty_weight * D_loss_penalty_B
