@@ -21,18 +21,18 @@ class ResnetGenerator(nn.Module):
         C = ngf * 4 #256
 
         # Gamma, Beta block
-        if self.light:
-            FC = [nn.Linear(C, C, bias=False),
-                  nn.GELU(),
-                  nn.Linear(C, C, bias=False),
-                  nn.GELU()]
-        else:
-            FC = [nn.Linear(img_size // 4 * img_size // C * 4, C, bias=False),
-                  nn.GELU(),
-                  nn.Linear(C, C, bias=False),
-                  nn.GELU()]  #nn.ReLU(True)
-        self.gamma = nn.Linear(C, C, bias=False)
-        self.beta = nn.Linear(C, C, bias=False)
+        #if self.light:
+        #    FC = [nn.Linear(C, C, bias=False),
+        #          nn.GELU(),
+        #          nn.Linear(C, C, bias=False),
+        #          nn.GELU()]
+        #else:
+        #    FC = [nn.Linear(img_size // 4 * img_size // C * 4, C, bias=False),
+        #          nn.GELU(),
+        #          nn.Linear(C, C, bias=False),
+        #          nn.GELU()]  #nn.ReLU(True)
+        #self.gamma = nn.Linear(C, C, bias=False)
+        #self.beta = nn.Linear(C, C, bias=False)
 
         # Bottleneck
         self.inv1 = Inv2d(channels=C, kernel_size=3, stride=1) # channel+k+3 => channel=256, k=32, 291 => channel=128, k=64, 195
@@ -84,7 +84,7 @@ class ResnetGenerator(nn.Module):
                          nn.Tanh()]
 
 
-        self.FC = nn.Sequential(*FC)
+        #self.FC = nn.Sequential(*FC)
         self.dec0 = nn.Sequential(*dec0)
         self.dec1 = nn.Sequential(*dec1)
         self.dec2 = nn.Sequential(*dec2)
@@ -109,26 +109,26 @@ class ResnetGenerator(nn.Module):
 
 
         # computation gamma, beta
-        if self.light:
-            xx_ = torch.nn.functional.adaptive_avg_pool2d(x, 1)
-            xx_ = self.FC(xx_.view(xx_.shape[0], -1))
-        else:
-            xx_ = self.FC(x.view(x.shape[0], -1))
-        gamma, beta = self.gamma(xx_), self.beta(xx_)
+        #if self.light:
+        #    xx_ = torch.nn.functional.adaptive_avg_pool2d(x, 1)
+        #    xx_ = self.FC(xx_.view(xx_.shape[0], -1))
+        #else:
+        #    xx_ = self.FC(x.view(x.shape[0], -1))
+        #gamma, beta = self.gamma(xx_), self.beta(xx_)
         
         # Bottleneck
         mask = None
-        x, mask = self.SGfomer1(x, H, W, mask, gamma, beta)
+        x, mask = self.SGfomer1(x, H, W, mask)
         x = self.inv1(x)
-        x, mask = self.SGfomer2(x, H, W, mask, gamma, beta)
+        x, mask = self.SGfomer2(x, H, W, mask)
         x = self.inv2(x)
-        x, mask = self.SGfomer3(x, H, W, mask, gamma, beta)
+        x, mask = self.SGfomer3(x, H, W, mask)
         x = self.inv3(x)
-        x, mask = self.SGfomer4(x, H, W, mask, gamma, beta)
+        x, mask = self.SGfomer4(x, H, W, mask)
         x = self.inv4(x)
-        x, mask = self.SGfomer5(x, H, W, mask, gamma, beta)
+        x, mask = self.SGfomer5(x, H, W, mask)
         x = self.inv5(x)
-        x, mask = self.SGfomer6(x, H, W, mask, gamma, beta)
+        x, mask = self.SGfomer6(x, H, W, mask)
         #x = self.inv6(x)
         #x, mask = self.SGfomer7(x, H, W, mask, gamma, beta)
         #x = self.inv7(x)
@@ -248,3 +248,4 @@ class Discriminator(nn.Module):
         #x1, x2, x3 for loss CT.
         
         return x1, x2, x3, out1, out2, z
+
