@@ -9,6 +9,7 @@ from glob import glob
 from thop import profile
 from thop import clever_format
 import shutil
+import random
 
 class QSGAN(object) :
     def __init__(self, args):
@@ -188,7 +189,7 @@ class QSGAN(object) :
         print('training start !')
         start_time = time.time()
         for step in range(self.start_iter, self.iteration + 1):
-            self.n_res = randint(1, 100)
+            self.n_res = random.randint(1, 100)
             if step > 100:
                 self.n_res = 100
             if self.decay_flag and step > (self.iteration // 2):
