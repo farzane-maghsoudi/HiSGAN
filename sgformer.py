@@ -119,7 +119,7 @@ class Attention(nn.Module):
             if m.bias is not None:
                 m.bias.data.zero_()
 
-    def forward(self, x, H, W, mask):
+    def forward(self, x, H, W, mask, gamma, beta):
         x = x.flatten(2).transpose(1, 2)
         B, L, C = x.shape
         B_, N= H, W
