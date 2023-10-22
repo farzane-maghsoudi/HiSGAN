@@ -174,16 +174,16 @@ class QSGAN(object) :
             if step % self.print_freq == 0:
                 for _ in range(testnum):
                     try:
-                        real_A, _ = testA_iter.next()
+                        real_A, _ = next(testA_iter) #testA_iter.next()
                     except:
                         testA_iter = iter(self.testA_loader)
-                        real_A, _ = testA_iter.next()
+                        real_A, _ =next(testA_iter) #testA_iter.next()
 
                     try:
-                        real_B, _ = testB_iter.next()
+                        real_B, _ = next(testB_iter) #testB_iter.next()
                     except:
                         testB_iter = iter(self.testB_loader)
-                        real_B, _ = testB_iter.next()
+                        real_B, _ = next(testB_iter) #testB_iter.next()
 
         print("self.start_iter",self.start_iter)
         print('training start !')
@@ -197,16 +197,16 @@ class QSGAN(object) :
                 self.D_optim.param_groups[0]['lr'] -= (self.lr / (self.iteration // 2))
 
             try:
-                real_A, _ = trainA_iter.next()
+                real_A, _ = next(trainA_iter) #trainA_iter.next()
             except:
                 trainA_iter = iter(self.trainA_loader)
-                real_A, _ = trainA_iter.next()
+                real_A, _ = next(trainA_iter) #trainA_iter.next()
 
             try:
-                real_B, _ = trainB_iter.next()
+                real_B, _ = next(trainB_iter) #trainB_iter.next()
             except:
                 trainB_iter = iter(self.trainB_loader)
-                real_B, _ = trainB_iter.next()
+                real_B, _ = next(trainB_iter) #trainB_iter.next()
 
             real_A, real_B = real_A.to(self.device), real_B.to(self.device)
 
