@@ -40,20 +40,24 @@ class ResnetGenerator(nn.Module):
         self.inv3 = Inv2d(channels=C, kernel_size=3, stride=1) 
         self.inv4 = Inv2d(channels=C, kernel_size=3, stride=1) 
         self.inv5 = Inv2d(channels=C, kernel_size=3, stride=1) 
-        #self.inv6 = Inv2d(channels=C, kernel_size=3, stride=1) 
-        #self.inv7 = Inv2d(channels=C, kernel_size=3, stride=1) 
+        self.inv6 = Inv2d(channels=C, kernel_size=3, stride=1) 
+        self.inv7 = Inv2d(channels=C, kernel_size=3, stride=1) 
 
         self.SGfomer1 = Block(C, mask= False, num_heads=8, mlp_ratio=4., qkv_bias=True, qk_scale=False, drop=0., attn_drop=0.,
                  drop_path=0., act_layer=nn.GELU,sr_ratio=8, linear=False)
         self.SGfomer2 = Block(C, mask= True, num_heads=8, mlp_ratio=4., qkv_bias=True, qk_scale=False, drop=0., attn_drop=0.,
                  drop_path=0., act_layer=nn.GELU, sr_ratio=8, linear=False)
         self.SGfomer3 = Block(C, mask= False, num_heads=8, mlp_ratio=4., qkv_bias=True, qk_scale=False, drop=0., attn_drop=0.,
-                 drop_path=0., act_layer=nn.GELU, sr_ratio=2, linear=False)
+                 drop_path=0., act_layer=nn.GELU, sr_ratio=4, linear=False)
         self.SGfomer4 = Block(C, mask= True, num_heads=8, mlp_ratio=4., qkv_bias=True, qk_scale=False, drop=0., attn_drop=0.,
-                 drop_path=0., act_layer=nn.GELU,  sr_ratio=2, linear=False)
+                 drop_path=0., act_layer=nn.GELU,  sr_ratio=4, linear=False)
         self.SGfomer5 = Block(C, mask= False, num_heads=8, mlp_ratio=4., qkv_bias=True, qk_scale=False, drop=0., attn_drop=0.,
-                 drop_path=0., act_layer=nn.GELU, sr_ratio=1, linear=False)
+                 drop_path=0., act_layer=nn.GELU, sr_ratio=2, linear=False)
         self.SGfomer6 = Block(C, mask= True, num_heads=8, mlp_ratio=4., qkv_bias=True, qk_scale=False, drop=0., attn_drop=0.,
+                 drop_path=0., act_layer=nn.GELU, sr_ratio=2, linear=False)
+        self.SGfomer7 = Block(C, mask= False, num_heads=8, mlp_ratio=4., qkv_bias=True, qk_scale=False, drop=0., attn_drop=0.,
+                 drop_path=0., act_layer=nn.GELU, sr_ratio=1, linear=False)
+        self.SGfomer8 = Block(C, mask= True, num_heads=8, mlp_ratio=4., qkv_bias=True, qk_scale=False, drop=0., attn_drop=0.,
                  drop_path=0., act_layer=nn.GELU, sr_ratio=1, linear=False)
         #self.SGfomer7 = Block(C, mask= False, num_heads=8, mlp_ratio=4., qkv_bias=True, qk_scale=False, drop=0., attn_drop=0.,
         #         drop_path=0., act_layer=nn.GELU, nsr_ratio=1, linear=False)
@@ -129,6 +133,10 @@ class ResnetGenerator(nn.Module):
         x, mask = self.SGfomer5(x, H, W, mask)
         x = self.inv5(x)
         x, mask = self.SGfomer6(x, H, W, mask)
+        x = self.inv6(x)
+        x, mask = self.SGfomer7(x, H, W, mask)
+        x = self.inv7(x)
+        x, mask = self.SGfomer8(x, H, W, mask)
         #x = self.inv6(x)
         #x, mask = self.SGfomer7(x, H, W, mask, gamma, beta)
         #x = self.inv7(x)
