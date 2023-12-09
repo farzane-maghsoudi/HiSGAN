@@ -312,7 +312,7 @@ class QSGAN(object) :
                 #save_dr_latest = "/content/gdrive/MyDrive/checkpointTTL-GAN/" + self.dataset + "_params_latest.pt"
                 #save_TTLGAN_latest = "/content/TTL-GAN/results/" + self.dataset + "_params_latest.pt"
                 save_dr_step = "/content/gdrive/MyDrive/checkpointQS-GAN/" + self.dataset + '_params_%07d.pt' % step
-                save_QSGAN_step = "/content/QS-GAN/results/" + self.dataset + "/model/" + self.dataset + '_params_%07d.pt' % step
+                save_QSGAN_step = "/content/HiSGAN/results/" + self.dataset + "/model/" + self.dataset + '_params_%07d.pt' % step
                 #shutil.copy( save_QSGAN_latest , save_dr_latest )
                 shutil.copy( save_QSGAN_step , save_dr_step )
 
